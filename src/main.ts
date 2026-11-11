@@ -5,6 +5,7 @@ import { GameOverScene } from './scenes/GameOverScene';
 import { GameScene } from './scenes/GameScene';
 import { MenuScene } from './scenes/MenuScene';
 import { UIScene } from './scenes/UIScene';
+import { setupAutoLandscapeFullscreen } from './systems/FullscreenManager';
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -25,4 +26,6 @@ const config: Phaser.Types.Core.GameConfig = {
   scene: [BootScene, MenuScene, GameScene, UIScene, GameOverScene]
 };
 
-new Phaser.Game(config);
+const game = new Phaser.Game(config);
+setupAutoLandscapeFullscreen(game);
+

@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { DIFFICULTY_CONFIGS, GAME_HEIGHT, GAME_WIDTH } from '../config/GameBalance';
 import { SoundManager } from '../audio/SoundManager';
+import { toggleGameFullscreen } from '../systems/FullscreenManager';
 import { GameStatsResult } from '../types/GameTypes';
 
 export class GameOverScene extends Phaser.Scene {
@@ -124,7 +125,8 @@ export class GameOverScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setInteractive({ useHandCursor: true });
 
-    fullscreenBtn.on('pointerup', () => {
+    fullscreenBtn.on('pointerup', (_pointer: Phaser.Input.Pointer, _lx: number, _ly: number, event: Phaser.Types.Input.EventData) => {
+      event.stopPropagation();
       SoundManager.playSelect();
       this.toggleFullscreen();
     });
@@ -150,12 +152,7 @@ export class GameOverScene extends Phaser.Scene {
   }
 
   private toggleFullscreen(): void {
-    if (!this.scale.fullscreen.available) return;
-    if (this.scale.isFullscreen) {
-      this.scale.stopFullscreen();
-    } else {
-      this.scale.startFullscreen();
-    }
+    toggleGameFullscreen(this.scale);
   }
 
   private getFullscreenLabel(): string {

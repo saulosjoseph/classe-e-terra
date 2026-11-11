@@ -14,6 +14,7 @@ import {
   WORLD_CENTER_Y
 } from '../config/GameBalance';
 import { SoundManager } from '../audio/SoundManager';
+import { toggleGameFullscreen } from '../systems/FullscreenManager';
 import {
   IntegratedActionType,
   LocalActionType,
@@ -238,7 +239,8 @@ export class UIScene extends Phaser.Scene {
       .setInteractive({ useHandCursor: true })
       .setDepth(80);
 
-    btnFullscreen.on('pointerup', () => {
+    btnFullscreen.on('pointerup', (_pointer: Phaser.Input.Pointer, _lx: number, _ly: number, event: Phaser.Types.Input.EventData) => {
+      event.stopPropagation();
       SoundManager.unlock();
       SoundManager.playSelect();
       this.toggleFullscreen();
@@ -265,12 +267,7 @@ export class UIScene extends Phaser.Scene {
   }
 
   private toggleFullscreen(): void {
-    if (!this.scale.fullscreen.available) return;
-    if (this.scale.isFullscreen) {
-      this.scale.stopFullscreen();
-    } else {
-      this.scale.startFullscreen();
-    }
+    toggleGameFullscreen(this.scale);
   }
 
   private getFullscreenLabel(): string {
