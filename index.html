@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#0b130e" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <title>Classe e Terra - A União do Tapajós</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        user-select: none;
+        -webkit-user-select: none;
+        -webkit-touch-callout: none;
+      }
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background-color: #090d0a;
+        font-family: 'Courier New', Courier, monospace;
+        touch-action: none;
+        overscroll-behavior: none;
+      }
+      #game-container {
+        width: 100vw;
+        height: 100dvh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        touch-action: none;
+      }
+      canvas {
+        display: block;
+        image-rendering: pixelated;
+        image-rendering: crisp-edges;
+        touch-action: none;
+        box-shadow: 0 0 24px rgba(0, 0, 0, 0.85);
+      }
+      #rotate-hint {
+        display: none;
+        position: fixed;
+        top: 8px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 9999;
+        background: rgba(9, 13, 10, 0.92);
+        border: 1px solid #4ade80;
+        color: #fef08a;
+        font-size: 11px;
+        font-weight: bold;
+        padding: 4px 10px;
+        border-radius: 4px;
+        pointer-events: none;
+        white-space: nowrap;
+      }
+      @media screen and (orientation: portrait) and (max-width: 600px) {
+        #rotate-hint {
+          display: block;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="rotate-hint">🔄 Gire o celular de lado (modo paisagem) para melhor experiência!</div>
+    <div id="game-container"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

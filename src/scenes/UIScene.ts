@@ -1,0 +1,711 @@
+import Phaser from 'phaser';
+import {
+  BALANCE,
+  CAMPO_RADIUS,
+  CITY_RADIUS,
+  FLORESTA_OUTER_RADIUS,
+  GAME_WIDTH,
+  HUD_BOTTOM_HEIGHT,
+  HUD_TOP_HEIGHT,
+  MAP_BOTTOM_Y,
+  MAP_TOP_Y,
+  MAP_VIEWPORT_HEIGHT,
+  WORLD_CENTER_X,
+  WORLD_CENTER_Y
+} from '../config/GameBalance';
+import { SoundManager } from '../audio/SoundManager';
+import {
+  IntegratedActionType,
+  LocalActionType,
+  PoliticalPhaseDefinition,
+  SectorType
+} from '../types/GameTypes';
+import { GameScene } from './GameScene';
+
+interface TouchActionButton {
+  key: string;
+  rect: Phaser.GameObjects.Rectangle;
+  cooldownOverlay: Phaser.GameObjects.Rectangle;
+  titleText: Phaser.GameObjects.Text;
+  subText: Phaser.GameObjects.Text;
+  width: number;
+  height: number;
+}
+
+/**
+ * HUD Mobile-First em Paisagem (Landscape 720x405):
+ * - Topo (0..54px): Saúde da Floresta (esquerda), Fase Política e Status (centro), Consciência Coletiva (direita).
+ * - Base / Zona dos Polegares (323..405px): Abas laterais rápidas + 4 ou 5 botões largos lado a lado.
+ * - Canto superior direito do viewport do mapa: Radar circular concêntrico interativo.
+ */
+export class UIScene extends Phaser.Scene {
+  private gameScene!: GameScene;
+
+  private topBarsGraphics!: Phaser.GameObjects.Graphics;
+  private forestValueText!: Phaser.GameObjects.Text;
+  private consciousnessValueText!: Phaser.GameObjects.Text;
+  private phaseTitleText!: Phaser.GameObjects.Text;
+  private statusChipsText!: Phaser.GameObjects.Text;
+  private bannerContainer!: Phaser.GameObjects.Container;
+  private bannerTitle!: Phaser.GameObjects.Text;
+  private bannerSub!: Phaser.GameObjects.Text;
+
+  private activeTab: 'INTEGRATED' | 'DEFENSE' = 'INTEGRATED';
+  private tabIntegratedBg!: Phaser.GameObjects.Rectangle;
+  private tabDefenseBg!: Phaser.GameObjects.Rectangle;
+  private integratedContainer!: Phaser.GameObjects.Container;
+  private defenseContainer!: Phaser.GameObjects.Container;
+
+  private integratedButtons: Map<IntegratedActionType, TouchActionButton> = new Map();
+  private defenseButtons: Map<string, TouchActionButton> = new Map();
+  private minimapGraphics!: Phaser.GameObjects.Graphics;
+  private currentSectorBadge!: Phaser.GameObjects.Text;
+  private readonly minimapX = GAME_WIDTH - 48;
+  private readonly minimapY = MAP_TOP_Y + 46;
+  private readonly minimapRadius = 36;
+
+  constructor() {
+    super('UIScene');
+  }
+
+  public init(data: { gameScene: GameScene }): void {
+    this.gameScene = data.gameScene;
+    this.activeTab = 'INTEGRATED';
+    this.integratedButtons.clear();
+    this.defenseButtons.clear();
+  }
+
+  public create(): void {
+    this.createTopHud();
+    this.createMapNavigationOverlay();
+    this.createBottomThumbPanel();
+    this.createPhaseBanner();
+
+    this.gameScene.phaseSystem.on(
+      'phase-changed',
+      (newPhase: PoliticalPhaseDefinition) => {
+        this.showMilestoneBanner(newPhase.milestone, newPhase.description);
+      }
+    );
+  }
+
+  private createTopHud(): void {
+    this.add
+      .rectangle(GAME_WIDTH / 2, HUD_TOP_HEIGHT / 2, GAME_WIDTH, HUD_TOP_HEIGHT, 0x090d0a, 0.96)
+      .setStrokeStyle(1.5, 0x27272a);
+
+    this.topBarsGraphics = this.add.graphics();
+
+    // Saúde da Floresta (Esquerda: x=14..184)
+    this.add.text(14, 7, '🌳 FLORESTA', {
+      fontFamily: 'Courier New, monospace',
+      fontSize: '11px',
+      fontStyle: 'bold',
+      color: '#4ade80'
+    });
+
+    this.forestValueText = this.add
+      .text(184, 7, '100%', {
+        fontFamily: 'Courier New, monospace',
+        fontSize: '11px',
+        fontStyle: 'bold',
+        color: '#ffffff'
+      })
+      .setOrigin(1, 0);
+
+    // Fase Política e Status (Centro: x=360)
+    this.phaseTitleText = this.add
+      .text(GAME_WIDTH / 2, 14, 'Fase 1: Resistência Sufocada', {
+        fontFamily: 'Courier New, monospace',
+        fontSize: '12px',
+        fontStyle: 'bold',
+        color: '#fde047'
+      })
+      .setOrigin(0.5);
+
+    this.statusChipsText = this.add
+      .text(GAME_WIDTH / 2, 34, '', {
+        fontFamily: 'Courier New, monospace',
+        fontSize: '9.5px',
+        color: '#d4d4d8'
+      })
+      .setOrigin(0.5);
+
+    // Consciência Coletiva (Direita: x=536..706)
+    this.add.text(536, 7, '✊ CONSCIÊNCIA', {
+      fontFamily: 'Courier New, monospace',
+      fontSize: '11px',
+      fontStyle: 'bold',
+      color: '#38bdf8'
+    });
+
+    this.consciousnessValueText = this.add
+      .text(GAME_WIDTH - 14, 7, '0%', {
+        fontFamily: 'Courier New, monospace',
+        fontSize: '11px',
+        fontStyle: 'bold',
+        color: '#ffffff'
+      })
+      .setOrigin(1, 0);
+  }
+
+  private createMapNavigationOverlay(): void {
+    this.minimapGraphics = this.add.graphics().setDepth(80);
+
+    const miniZone = this.add
+      .zone(this.minimapX, this.minimapY, this.minimapRadius * 2 + 8, this.minimapRadius * 2 + 8)
+      .setInteractive({ useHandCursor: true })
+      .setDepth(82);
+
+    miniZone.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      SoundManager.unlock();
+      const nx = (pointer.x - this.minimapX) / this.minimapRadius;
+      const ny = (pointer.y - this.minimapY) / this.minimapRadius;
+      const wx = WORLD_CENTER_X + nx * FLORESTA_OUTER_RADIUS;
+      const wy = WORLD_CENTER_Y + ny * FLORESTA_OUTER_RADIUS;
+      this.gameScene.centerCameraOnPoint(wx, wy, true);
+    });
+
+    this.currentSectorBadge = this.add
+      .text(12, MAP_TOP_Y + 8, '📍 CIDADE (Centro) • Arraste p/ mover o mapa', {
+        fontFamily: 'Courier New, monospace',
+        fontSize: '10px',
+        fontStyle: 'bold',
+        color: '#fef08a',
+        backgroundColor: '#090d0acc',
+        padding: { x: 6, y: 3 }
+      })
+      .setDepth(80);
+
+    const btnCity = this.add
+      .text(12, MAP_BOTTOM_Y - 26, '🏙️ IR P/ CIDADE', {
+        fontFamily: 'Courier New, monospace',
+        fontSize: '10px',
+        fontStyle: 'bold',
+        color: '#ffffff',
+        backgroundColor: '#78350fdd',
+        padding: { x: 6, y: 4 }
+      })
+      .setInteractive({ useHandCursor: true })
+      .setDepth(80);
+
+    btnCity.on('pointerdown', () => {
+      SoundManager.unlock();
+      SoundManager.playSelect();
+      this.gameScene.centerCameraOnPoint(WORLD_CENTER_X, WORLD_CENTER_Y, true);
+    });
+
+    const btnAlert = this.add
+      .text(136, MAP_BOTTOM_Y - 26, '🔥 IR P/ FOGO', {
+        fontFamily: 'Courier New, monospace',
+        fontSize: '10px',
+        fontStyle: 'bold',
+        color: '#fef08a',
+        backgroundColor: '#991b1bdd',
+        padding: { x: 6, y: 4 }
+      })
+      .setInteractive({ useHandCursor: true })
+      .setDepth(80);
+
+    btnAlert.on('pointerdown', () => {
+      SoundManager.unlock();
+      SoundManager.playSelect();
+      const fires = this.gameScene.fireSystem.getActiveFires();
+      const arsonists = this.gameScene.spawnerSystem.getArsonists();
+      if (fires.length > 0) {
+        this.gameScene.centerCameraOnPoint(fires[0].data.x, fires[0].data.y, true);
+      } else if (arsonists.length > 0) {
+        this.gameScene.centerCameraOnPoint(arsonists[0].x, arsonists[0].y, true);
+      } else {
+        this.gameScene.centerCameraOnPoint(
+          WORLD_CENTER_X,
+          WORLD_CENTER_Y + CAMPO_RADIUS + 80,
+          true
+        );
+      }
+    });
+  }
+
+  private createBottomThumbPanel(): void {
+    this.add
+      .rectangle(
+        GAME_WIDTH / 2,
+        MAP_BOTTOM_Y + HUD_BOTTOM_HEIGHT / 2,
+        GAME_WIDTH,
+        HUD_BOTTOM_HEIGHT,
+        0x090d0a,
+        0.98
+      )
+      .setStrokeStyle(2, 0x27272a);
+
+    // Seletores de Aba na coluna esquerda do painel inferior (x = 72)
+    this.tabIntegratedBg = this.add
+      .rectangle(72, MAP_BOTTOM_Y + 23, 128, 32, 0x065f46, 1)
+      .setStrokeStyle(2, 0x4ade80)
+      .setInteractive({ useHandCursor: true });
+
+    this.add
+      .text(72, MAP_BOTTOM_Y + 23, '🤝 INTEGRADAS', {
+        fontFamily: 'Courier New, monospace',
+        fontSize: '11px',
+        fontStyle: 'bold',
+        color: '#ffffff'
+      })
+      .setOrigin(0.5);
+
+    this.tabDefenseBg = this.add
+      .rectangle(72, MAP_BOTTOM_Y + 59, 128, 32, 0x18181b, 1)
+      .setStrokeStyle(1.5, 0x52525b)
+      .setInteractive({ useHandCursor: true });
+
+    this.add
+      .text(72, MAP_BOTTOM_Y + 59, '🧯 DEFESA/UNID.', {
+        fontFamily: 'Courier New, monospace',
+        fontSize: '11px',
+        fontStyle: 'bold',
+        color: '#e4e4e7'
+      })
+      .setOrigin(0.5);
+
+    this.tabIntegratedBg.on('pointerdown', () => {
+      SoundManager.unlock();
+      SoundManager.playSelect();
+      this.switchTab('INTEGRATED');
+    });
+
+    this.tabDefenseBg.on('pointerdown', () => {
+      SoundManager.unlock();
+      SoundManager.playSelect();
+      this.switchTab('DEFENSE');
+    });
+
+    this.integratedContainer = this.add.container(0, 0);
+    this.defenseContainer = this.add.container(0, 0);
+
+    this.buildIntegratedButtons();
+    this.buildDefenseButtons();
+    this.switchTab('INTEGRATED');
+  }
+
+  private buildIntegratedButtons(): void {
+    const diff = this.gameScene.difficulty;
+    const sGain = diff.integratedSectorGain;
+    const cGain = diff.captureExposeGain;
+    const rowY = MAP_BOTTOM_Y + HUD_BOTTOM_HEIGHT / 2;
+
+    const specs: Array<{
+      type: IntegratedActionType;
+      x: number;
+      title: string;
+      sub: string;
+      color: number;
+    }> = [
+      {
+        type: IntegratedActionType.CIDADE_PARA_FLORESTA,
+        x: 212,
+        title: '🏙️➔🌳 EQUIPAR',
+        sub: `+${sGain}% Consc.|Turbo`,
+        color: 0x0c4a6e
+      },
+      {
+        type: IntegratedActionType.CAMPO_PARA_CIDADE,
+        x: 352,
+        title: '🌾➔🏙️ ALIMENTO',
+        sub: `+${sGain}% Consc.|Alívio`,
+        color: 0x713f12
+      },
+      {
+        type: IntegratedActionType.FLORESTA_PARA_CAMPO,
+        x: 492,
+        title: '🌳➔🌾 NASCENTE',
+        sub: `+${sGain}% Consc.|Escudo`,
+        color: 0x064e3b
+      },
+      {
+        type: IntegratedActionType.CAPTURA_PARA_CIDADE,
+        x: 636,
+        title: '📢 EXPOR (0)',
+        sub: `+${cGain}% Consc. Imed.!`,
+        color: 0x7f1d1d
+      }
+    ];
+
+    for (const s of specs) {
+      const btn = this.createTouchButton(
+        this.integratedContainer,
+        s.type,
+        s.x,
+        rowY,
+        134,
+        66,
+        s.title,
+        s.sub,
+        s.color,
+        () => {
+          this.gameScene.triggerIntegratedAction(s.type);
+        }
+      );
+      this.integratedButtons.set(s.type, btn);
+    }
+  }
+
+  private buildDefenseButtons(): void {
+    const rowY = MAP_BOTTOM_Y + HUD_BOTTOM_HEIGHT / 2;
+
+    const specs: Array<{
+      key: string;
+      x: number;
+      title: string;
+      sub: string;
+      color: number;
+      onClick: () => void;
+    }> = [
+      {
+        key: 'RECRUIT_BRIGADISTA',
+        x: 198,
+        title: '🧯 BRIGADA',
+        sub: 'Requer 20%',
+        color: 0x9a3412,
+        onClick: () => this.gameScene.tryRecruitBrigadista()
+      },
+      {
+        key: 'RECRUIT_GUARDA',
+        x: 312,
+        title: '🎯 GUARDA',
+        sub: 'Requer 50%',
+        color: 0x065f46,
+        onClick: () => this.gameScene.tryRecruitGuarda()
+      },
+      {
+        key: LocalActionType.CAMPO_ACEIRO,
+        x: 426,
+        title: '🛡️ ACEIRO',
+        sub: 'Anel no Campo',
+        color: 0x78350f,
+        onClick: () => this.gameScene.triggerLocalAction(LocalActionType.CAMPO_ACEIRO)
+      },
+      {
+        key: LocalActionType.CIDADE_BARREIRA_EXAUSTAO,
+        x: 540,
+        title: '💨 EXAUSTÃO',
+        sub: 'Limpa Fumaça',
+        color: 0x1e3a8a,
+        onClick: () =>
+          this.gameScene.triggerLocalAction(LocalActionType.CIDADE_BARREIRA_EXAUSTAO)
+      },
+      {
+        key: LocalActionType.FLORESTA_REFLORESTAMENTO,
+        x: 654,
+        title: '🌱 PLANTIO',
+        sub: '+12% Floresta',
+        color: 0x14532d,
+        onClick: () =>
+          this.gameScene.triggerLocalAction(LocalActionType.FLORESTA_REFLORESTAMENTO)
+      }
+    ];
+
+    for (const s of specs) {
+      const btn = this.createTouchButton(
+        this.defenseContainer,
+        s.key,
+        s.x,
+        rowY,
+        108,
+        66,
+        s.title,
+        s.sub,
+        s.color,
+        s.onClick
+      );
+      this.defenseButtons.set(s.key, btn);
+    }
+  }
+
+  private createTouchButton(
+    container: Phaser.GameObjects.Container,
+    key: string,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    title: string,
+    sub: string,
+    fillColor: number,
+    onTap: () => void
+  ): TouchActionButton {
+    const rect = this.add
+      .rectangle(x, y, width, height, fillColor, 0.95)
+      .setStrokeStyle(2, 0x71717a)
+      .setInteractive({ useHandCursor: true });
+
+    const cooldownOverlay = this.add
+      .rectangle(x - width / 2, y, 0, height, 0x000000, 0.68)
+      .setOrigin(0, 0.5);
+
+    const titleText = this.add
+      .text(x, y - 10, title, {
+        fontFamily: 'Courier New, monospace',
+        fontSize: width < 120 ? '11px' : '12px',
+        fontStyle: 'bold',
+        color: '#ffffff'
+      })
+      .setOrigin(0.5);
+
+    const subText = this.add
+      .text(x, y + 11, sub, {
+        fontFamily: 'Courier New, monospace',
+        fontSize: '9.5px',
+        color: '#e2e8f0'
+      })
+      .setOrigin(0.5);
+
+    rect.on('pointerdown', () => {
+      SoundManager.unlock();
+      onTap();
+    });
+
+    container.add([rect, cooldownOverlay, titleText, subText]);
+
+    return {
+      key,
+      rect,
+      cooldownOverlay,
+      titleText,
+      subText,
+      width,
+      height
+    };
+  }
+
+  private switchTab(tab: 'INTEGRATED' | 'DEFENSE'): void {
+    this.activeTab = tab;
+    const isInt = tab === 'INTEGRATED';
+
+    this.integratedContainer.setVisible(isInt);
+    this.defenseContainer.setVisible(!isInt);
+
+    this.tabIntegratedBg.setFillStyle(isInt ? 0x065f46 : 0x18181b, 1);
+    this.tabIntegratedBg.setStrokeStyle(isInt ? 2 : 1, isInt ? 0x4ade80 : 0x52525b);
+
+    this.tabDefenseBg.setFillStyle(!isInt ? 0x065f46 : 0x18181b, 1);
+    this.tabDefenseBg.setStrokeStyle(!isInt ? 2 : 1, !isInt ? 0x4ade80 : 0x52525b);
+  }
+
+  private createPhaseBanner(): void {
+    const bg = this.add
+      .rectangle(0, 0, 440, 50, 0x090d0a, 0.94)
+      .setStrokeStyle(2, 0xfacc15);
+
+    this.bannerTitle = this.add
+      .text(0, -10, '', {
+        fontFamily: 'Courier New, monospace',
+        fontSize: '12px',
+        fontStyle: 'bold',
+        color: '#fde047'
+      })
+      .setOrigin(0.5);
+
+    this.bannerSub = this.add
+      .text(0, 9, '', {
+        fontFamily: 'Courier New, monospace',
+        fontSize: '10px',
+        color: '#f4f4f5',
+        align: 'center',
+        wordWrap: { width: 420 }
+      })
+      .setOrigin(0.5);
+
+    this.bannerContainer = this.add
+      .container(GAME_WIDTH / 2, MAP_TOP_Y + 34, [bg, this.bannerTitle, this.bannerSub])
+      .setDepth(100)
+      .setAlpha(0);
+  }
+
+  private showMilestoneBanner(title: string, description: string): void {
+    this.bannerTitle.setText(`★ ${title}`);
+    this.bannerSub.setText(description);
+    this.bannerContainer.setAlpha(1);
+
+    this.tweens.killTweensOf(this.bannerContainer);
+    this.tweens.add({
+      targets: this.bannerContainer,
+      alpha: { from: 1, to: 0 },
+      delay: 3400,
+      duration: 600
+    });
+  }
+
+  public override update(): void {
+    if (!this.gameScene || !this.gameScene.phaseSystem) return;
+
+    const forest = this.gameScene.getForestHealth();
+    const consc = this.gameScene.phaseSystem.getConsciousness();
+    const phase = this.gameScene.phaseSystem.getCurrentPhase();
+
+    this.forestValueText.setText(`${Math.round(forest)}%`);
+    this.consciousnessValueText.setText(`${Math.round(consc)}%`);
+    this.phaseTitleText.setText(`${phase.title}`);
+
+    this.topBarsGraphics.clear();
+
+    // Barra da Floresta (Esquerda: x=14, y=24, w=170, h=14)
+    this.topBarsGraphics.fillStyle(0x18181b, 1);
+    this.topBarsGraphics.fillRect(14, 24, 170, 14);
+    const forestColor = forest > 50 ? 0x22c55e : forest > 25 ? 0xeab308 : 0xef4444;
+    this.topBarsGraphics.fillStyle(forestColor, 1);
+    this.topBarsGraphics.fillRect(14, 24, 170 * (forest / 100), 14);
+
+    // Barra de Consciência Coletiva (Direita: x=536, y=24, w=170, h=14)
+    this.topBarsGraphics.fillStyle(0x18181b, 1);
+    this.topBarsGraphics.fillRect(536, 24, 170, 14);
+    this.topBarsGraphics.fillStyle(0x38bdf8, 1);
+    this.topBarsGraphics.fillRect(536, 24, 170 * (consc / 100), 14);
+
+    const marks = [0.2, 0.35, 0.5, 0.65];
+    this.topBarsGraphics.fillStyle(0xffffff, 0.65);
+    for (const m of marks) {
+      this.topBarsGraphics.fillRect(536 + 170 * m, 24, 1.5, 14);
+    }
+
+    const ajusteTxt = this.gameScene.phaseSystem.isAjusteFiscalActive()
+      ? '⚠️Ajuste Fiscal'
+      : '✅Verba Livre';
+    const citySmoke = this.gameScene.fireSystem.getSectorSmokeLevel(SectorType.CIDADE);
+    const forestSmoke = this.gameScene.fireSystem.getSectorSmokeLevel(SectorType.FLORESTA);
+    const maxSmoke = Math.max(citySmoke, forestSmoke);
+    const smokeTxt =
+      maxSmoke >= 2 ? `⚫Fumaça Nv.${maxSmoke} (2x Recarga)` : '💨Ar Estável';
+
+    this.statusChipsText.setText(
+      `[${this.gameScene.difficulty.label}] ${ajusteTxt} | ${smokeTxt}`
+    );
+
+    for (const [type, btn] of this.integratedButtons.entries()) {
+      if (type === IntegratedActionType.CAPTURA_PARA_CIDADE) {
+        const count = this.gameScene.sectorSystem.getCapturedQueue();
+        btn.titleText.setText(`📢 EXPOR (${count})`);
+        const ready = count > 0;
+        btn.rect.setStrokeStyle(ready ? 2.5 : 1.5, ready ? 0xfde047 : 0x52525b);
+        btn.cooldownOverlay.width = ready ? 0 : btn.width;
+      } else {
+        const ratio = this.gameScene.sectorSystem.getCooldownRemainingRatio(type);
+        btn.cooldownOverlay.width = btn.width * ratio;
+        btn.rect.setStrokeStyle(ratio <= 0 ? 2 : 1, ratio <= 0 ? 0x4ade80 : 0x52525b);
+      }
+    }
+
+    const brigBtn = this.defenseButtons.get('RECRUIT_BRIGADISTA');
+    if (brigBtn) {
+      const unlocked = this.gameScene.phaseSystem.isBrigadaComunitariaUnlocked();
+      const count = this.gameScene.getBrigadistaCount();
+      brigBtn.titleText.setText(`🧯 BRIGADA(${count}/${BALANCE.MAX_BRIGADISTAS})`);
+      if (!unlocked) {
+        brigBtn.subText.setText('🔒 Requer 20%');
+        brigBtn.cooldownOverlay.width = brigBtn.width;
+      } else if (count >= BALANCE.MAX_BRIGADISTAS) {
+        brigBtn.subText.setText('Limite Máx.');
+        brigBtn.cooldownOverlay.width = brigBtn.width;
+      } else {
+        brigBtn.subText.setText('Invocar Esquadrão');
+        const ratio = this.gameScene.getBrigadistaRecruitCooldownRatio();
+        brigBtn.cooldownOverlay.width = brigBtn.width * ratio;
+      }
+    }
+
+    const guardaBtn = this.defenseButtons.get('RECRUIT_GUARDA');
+    if (guardaBtn) {
+      const unlocked = this.gameScene.phaseSystem.isGuardaFlorestalUnlocked();
+      const count = this.gameScene.getGuardaCount();
+      guardaBtn.titleText.setText(`🎯 GUARDA(${count}/${BALANCE.MAX_GUARDAS})`);
+      if (!unlocked) {
+        guardaBtn.subText.setText('🔒 Requer 50%');
+        guardaBtn.cooldownOverlay.width = guardaBtn.width;
+      } else if (count >= BALANCE.MAX_GUARDAS) {
+        guardaBtn.subText.setText('Limite Máx.');
+        guardaBtn.cooldownOverlay.width = guardaBtn.width;
+      } else {
+        guardaBtn.subText.setText('Emboscada/Elite');
+        const ratio = this.gameScene.getGuardaRecruitCooldownRatio();
+        guardaBtn.cooldownOverlay.width = guardaBtn.width * ratio;
+      }
+    }
+
+    const localTypes = [
+      LocalActionType.CAMPO_ACEIRO,
+      LocalActionType.CIDADE_BARREIRA_EXAUSTAO,
+      LocalActionType.FLORESTA_REFLORESTAMENTO
+    ];
+    for (const lt of localTypes) {
+      const btn = this.defenseButtons.get(lt);
+      if (btn) {
+        const ratio = this.gameScene.sectorSystem.getCooldownRemainingRatio(lt);
+        btn.cooldownOverlay.width = btn.width * ratio;
+      }
+    }
+
+    this.updateMinimapAndSectorIndicator();
+  }
+
+  private updateMinimapAndSectorIndicator(): void {
+    const viewInfo = this.gameScene.getCameraCenterWorldPoint();
+    const sectorName =
+      viewInfo.sector === SectorType.CIDADE
+        ? '🏙️ CIDADE (Centro)'
+        : viewInfo.sector === SectorType.CAMPO
+          ? '🌾 CAMPO (Anel Médio)'
+          : '🌳 FLORESTA (Anel Externo)';
+    this.currentSectorBadge.setText(`📍 ${sectorName} • Arraste p/ mover`);
+
+    const g = this.minimapGraphics;
+    g.clear();
+
+    const mx = this.minimapX;
+    const my = this.minimapY;
+    const r = this.minimapRadius;
+    const scale = r / FLORESTA_OUTER_RADIUS;
+
+    g.fillStyle(0x090d0a, 0.88);
+    g.fillCircle(mx, my, r + 3);
+
+    g.fillStyle(0x064e3b, 0.95);
+    g.fillCircle(mx, my, FLORESTA_OUTER_RADIUS * scale);
+
+    g.fillStyle(0x3f6212, 0.95);
+    g.fillCircle(mx, my, CAMPO_RADIUS * scale);
+
+    g.fillStyle(0x92400e, 0.95);
+    g.fillCircle(mx, my, CITY_RADIUS * scale);
+
+    g.lineStyle(1, 0xa1a1aa, 0.6);
+    g.strokeCircle(mx, my, r + 2);
+
+    for (const f of this.gameScene.fireSystem.getActiveFires()) {
+      const fx = mx + (f.data.x - WORLD_CENTER_X) * scale;
+      const fy = my + (f.data.y - WORLD_CENTER_Y) * scale;
+      g.fillStyle(0xef4444, 1);
+      g.fillCircle(fx, fy, 2.5);
+    }
+
+    for (const a of this.gameScene.spawnerSystem.getArsonists()) {
+      const ax = mx + (a.x - WORLD_CENTER_X) * scale;
+      const ay = my + (a.y - WORLD_CENTER_Y) * scale;
+      g.fillStyle(0xfacc15, 1);
+      g.fillCircle(ax, ay, 2);
+    }
+
+    for (const u of this.gameScene.getAllUnits()) {
+      const ux = mx + (u.x - WORLD_CENTER_X) * scale;
+      const uy = my + (u.y - WORLD_CENTER_Y) * scale;
+      g.fillStyle(0x38bdf8, 1);
+      g.fillCircle(ux, uy, 2.2);
+    }
+
+    const cam = this.gameScene.cameras.main;
+    const rx = mx + (cam.scrollX - WORLD_CENTER_X) * scale;
+    const ry = my + (cam.scrollY - WORLD_CENTER_Y) * scale;
+    const rw = GAME_WIDTH * scale;
+    const rh = MAP_VIEWPORT_HEIGHT * scale;
+    g.lineStyle(1.2, 0xffffff, 0.95);
+    g.strokeRect(rx, ry, rw, rh);
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "name": "classe-e-terra",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Classe e Terra - A União do Tapajós (Phaser 3 Mobile-First RTS/Defense)",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "phaser": "^3.80.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5",
+    "vite": "^5.2.11"
+  }
+}
