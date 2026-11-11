@@ -172,7 +172,43 @@ export class MenuScene extends Phaser.Scene {
       this.scene.start('GameScene', { difficulty: this.selectedDifficulty });
     });
 
-    // Botão de Áudio no rodapé direito
+    // Botões de Tela Cheia e Áudio no rodapé
+    const fullscreenBtn = this.add
+      .text(18, GAME_HEIGHT - 18, this.getFullscreenLabel(), {
+        fontFamily: 'Courier New, monospace',
+        fontSize: '11px',
+        color: '#a1a1aa',
+        backgroundColor: '#18181b',
+        padding: { x: 6, y: 4 }
+      })
+      .setOrigin(0, 0.5)
+      .setInteractive({ useHandCursor: true });
+
+    fullscreenBtn.on('pointerup', () => {
+      SoundManager.unlock();
+      SoundManager.playSelect();
+      this.toggleFullscreen();
+    });
+
+    const onFullscreenChange = () => {
+      if (fullscreenBtn.active) {
+        fullscreenBtn.setText(this.getFullscreenLabel());
+      }
+    };
+
+    this.scale.on(Phaser.Scale.Events.ENTER_FULLSCREEN, onFullscreenChange);
+    this.scale.on(Phaser.Scale.Events.LEAVE_FULLSCREEN, onFullscreenChange);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.scale.off(Phaser.Scale.Events.ENTER_FULLSCREEN, onFullscreenChange);
+      this.scale.off(Phaser.Scale.Events.LEAVE_FULLSCREEN, onFullscreenChange);
+    });
+
+    if (this.input.keyboard) {
+      this.input.keyboard.on('keydown-F', () => {
+        this.toggleFullscreen();
+      });
+    }
+
     const audioBtn = this.add
       .text(GAME_WIDTH - 18, GAME_HEIGHT - 18, this.getAudioLabel(), {
         fontFamily: 'Courier New, monospace',
@@ -188,6 +224,19 @@ export class MenuScene extends Phaser.Scene {
       SoundManager.toggleMute();
       audioBtn.setText(this.getAudioLabel());
     });
+  }
+
+  private toggleFullscreen(): void {
+    if (!this.scale.fullscreen.available) return;
+    if (this.scale.isFullscreen) {
+      this.scale.stopFullscreen();
+    } else {
+      this.scale.startFullscreen();
+    }
+  }
+
+  private getFullscreenLabel(): string {
+    return this.scale.isFullscreen ? '🗗 SAIR TELA CHEIA (F)' : '⛶ TELA CHEIA (F)';
   }
 
   private getAudioLabel(): string {

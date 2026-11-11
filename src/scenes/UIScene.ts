@@ -224,6 +224,57 @@ export class UIScene extends Phaser.Scene {
         );
       }
     });
+
+    const btnFullscreen = this.add
+      .text(GAME_WIDTH - 12, MAP_BOTTOM_Y - 26, this.getFullscreenLabel(), {
+        fontFamily: 'Courier New, monospace',
+        fontSize: '10px',
+        fontStyle: 'bold',
+        color: '#e4e4e7',
+        backgroundColor: '#18181bdd',
+        padding: { x: 6, y: 4 }
+      })
+      .setOrigin(1, 0)
+      .setInteractive({ useHandCursor: true })
+      .setDepth(80);
+
+    btnFullscreen.on('pointerup', () => {
+      SoundManager.unlock();
+      SoundManager.playSelect();
+      this.toggleFullscreen();
+    });
+
+    const onFullscreenChange = () => {
+      if (btnFullscreen.active) {
+        btnFullscreen.setText(this.getFullscreenLabel());
+      }
+    };
+
+    this.scale.on(Phaser.Scale.Events.ENTER_FULLSCREEN, onFullscreenChange);
+    this.scale.on(Phaser.Scale.Events.LEAVE_FULLSCREEN, onFullscreenChange);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.scale.off(Phaser.Scale.Events.ENTER_FULLSCREEN, onFullscreenChange);
+      this.scale.off(Phaser.Scale.Events.LEAVE_FULLSCREEN, onFullscreenChange);
+    });
+
+    if (this.input.keyboard) {
+      this.input.keyboard.on('keydown-F', () => {
+        this.toggleFullscreen();
+      });
+    }
+  }
+
+  private toggleFullscreen(): void {
+    if (!this.scale.fullscreen.available) return;
+    if (this.scale.isFullscreen) {
+      this.scale.stopFullscreen();
+    } else {
+      this.scale.startFullscreen();
+    }
+  }
+
+  private getFullscreenLabel(): string {
+    return this.scale.isFullscreen ? '🗗 SAIR TELA CHEIA' : '⛶ TELA CHEIA';
   }
 
   private createBottomThumbPanel(): void {
