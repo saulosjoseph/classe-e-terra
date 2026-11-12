@@ -1,4 +1,6 @@
 import Phaser from 'phaser';
+import '@fontsource/roboto/400.css';
+import '@fontsource/roboto/700.css';
 import { GAME_HEIGHT, GAME_WIDTH } from './config/GameBalance';
 import { BootScene } from './scenes/BootScene';
 import { GameOverScene } from './scenes/GameOverScene';
@@ -6,6 +8,15 @@ import { GameScene } from './scenes/GameScene';
 import { MenuScene } from './scenes/MenuScene';
 import { UIScene } from './scenes/UIScene';
 import { setupAutoLandscapeFullscreen } from './systems/FullscreenManager';
+
+const TEXT_SIZE_SCALE = 1.2;
+
+function scaleFontSize(size: string | number | undefined): string | number | undefined {
+  if (size === undefined) return size;
+  const px = typeof size === 'number' ? size : parseFloat(size);
+  if (!Number.isFinite(px)) return size;
+  return `${px * TEXT_SIZE_SCALE}px`;
+}
 
 /**
  * Configura globalmente a fábrica de textos do Phaser para renderizar em alta definição (HiDPI/Retina)
@@ -29,7 +40,7 @@ function installCrispTextDefaults(): void {
   const origText = textProto.text;
   const hiDpiResolution = Math.max(2, Math.min(3, Math.ceil(window.devicePixelRatio || 2)));
   const cleanFontStack =
-    'system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
+    'Roboto, system-ui, -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif';
 
   textProto.text = function (
     this: Phaser.GameObjects.GameObjectFactory,
@@ -41,6 +52,7 @@ function installCrispTextDefaults(): void {
     const mergedStyle: Phaser.Types.GameObjects.Text.TextStyle = {
       ...style,
       fontFamily: cleanFontStack,
+      fontSize: scaleFontSize(style?.fontSize),
       resolution: style?.resolution ?? hiDpiResolution
     };
     const txtObj = origText.call(this, x, y, text, mergedStyle);
@@ -74,7 +86,16 @@ const config: Phaser.Types.Core.GameConfig = {
   scene: [BootScene, MenuScene, GameScene, UIScene, GameOverScene]
 };
 
-const game = new Phaser.Game(config);
-setupAutoLandscapeFullscreen(game);
-(window as unknown as { game: Phaser.Game }).game = game;
+const fontsReady = Promise.all([
+  document.fonts.load('400 16px Roboto'),
+  document.fonts.load('700 16px Roboto')
+]).catch(() => undefined);
+
+installCrispTextDefaults();
+
+fontsReady.then(() => {
+  const game = new Phaser.Game(config);
+  setupAutoLandscapeFullscreen(game);
+  (window as unknown as { game: Phaser.Game }).game = game;
+});
 

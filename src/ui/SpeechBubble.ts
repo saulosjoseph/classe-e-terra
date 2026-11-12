@@ -1,8 +1,8 @@
 import Phaser from 'phaser';
 
-const BUBBLE_WIDTH = 230;
-const PADDING = 10;
-const HINT_GAP = 6;
+const BUBBLE_WIDTH = 290;
+const PADDING = 14;
+const HINT_GAP = 8;
 const TAIL_HEIGHT = 9;
 const TAIL_HALF_WIDTH = 7;
 const TAP_TOLERANCE_PX = 10;
@@ -20,18 +20,17 @@ export class SpeechBubble extends Phaser.GameObjects.Container {
     super(scene, 0, 0);
 
     const label = scene.add.text(0, 0, text, {
-      fontFamily: 'Courier New, monospace',
-      fontSize: '11px',
-      color: '#f4f4f5',
+      fontSize: '12.5px',
+      color: '#ffffff',
       align: 'left',
-      lineSpacing: 4,
+      lineSpacing: 6,
       wordWrap: { width: BUBBLE_WIDTH - PADDING * 2 }
     });
     label.setResolution(window.devicePixelRatio || 1);
 
     const hint = scene.add.text(0, 0, 'Toque para continuar', {
-      fontFamily: 'Courier New, monospace',
-      fontSize: '9px',
+      fontSize: '10px',
+      fontStyle: 'bold',
       color: '#facc15',
       align: 'center'
     });
@@ -43,7 +42,7 @@ export class SpeechBubble extends Phaser.GameObjects.Container {
     hint.setOrigin(0.5, 0).setPosition(0, top + PADDING + label.height + HINT_GAP);
     scene.tweens.add({
       targets: hint,
-      alpha: 0.35,
+      alpha: 0.7,
       duration: 600,
       yoyo: true,
       repeat: -1,
