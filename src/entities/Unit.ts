@@ -30,6 +30,7 @@ export abstract class Unit extends Phaser.Events.EventEmitter {
   protected maxStamina = 100;
   protected equipmentBoostUntil = 0;
   protected patrolAngle = 0;
+  protected statusBarOffsetY = 28;
 
   constructor(
     scene: Phaser.Scene,
@@ -159,7 +160,7 @@ export abstract class Unit extends Phaser.Events.EventEmitter {
     this.statusBar.clear();
     const w = 24;
     const h = 3;
-    const barY = this.y - 28;
+    const barY = this.y - this.statusBarOffsetY;
     this.statusBar.fillStyle(0x090d0a, 0.85);
     this.statusBar.fillRect(this.x - w / 2, barY, w, h);
     const ratio = Phaser.Math.Clamp(this.stamina / this.maxStamina, 0, 1);

@@ -77,12 +77,12 @@ export class GameScene extends Phaser.Scene {
   };
 
   // Controle de Zoom (Mouse Wheel e Movimento de Pinça no Touch)
-  private cameraZoom = 1.0;
+  private cameraZoom = 0.28125;
   private readonly minCameraZoom = 0.25;
   private readonly maxCameraZoom = 2.0;
   private isPinchingCamera = false;
   private initialPinchDistance = 0;
-  private initialPinchZoom = 1.0;
+  private initialPinchZoom = 0.28125;
 
   // Configurações do Grid Isométrico para a Cidade (casas populares brasileiras)
   private mapGridWidth = 6;
@@ -96,6 +96,7 @@ export class GameScene extends Phaser.Scene {
   private integratedActionsUsed = 0;
   private matchStartTime = 0;
   private isEnding = false;
+  public isStoryModalOpen = true;
 
   constructor() {
     super('GameScene');
@@ -114,11 +115,12 @@ export class GameScene extends Phaser.Scene {
     this.arsonistsCaptured = 0;
     this.integratedActionsUsed = 0;
     this.isEnding = false;
+    this.isStoryModalOpen = true;
     this.isDraggingCamera = false;
-    this.cameraZoom = 1.0;
+    this.cameraZoom = 0.28125;
     this.isPinchingCamera = false;
     this.initialPinchDistance = 0;
-    this.initialPinchZoom = 1.0;
+    this.initialPinchZoom = 0.28125;
   }
 
   public create(): void {
@@ -157,8 +159,8 @@ export class GameScene extends Phaser.Scene {
       22
     );
 
-    // Garante que a câmera começa centralizada exatamente na CIDADE!
-    this.centerCameraOnPoint(WORLD_CENTER_X, WORLD_CENTER_Y, false);
+    // Inicia a câmera posicionada no Campo (Anel Médio), enquadrando Floresta, Campo e Cidade conforme imagem de referência
+    this.centerCameraOnPoint(1864, 3994.5, false);
 
     this.registerEvents();
 
@@ -855,7 +857,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   public override update(_time: number, deltaMs: number): void {
-    if (this.isEnding) return;
+    if (this.isEnding || this.isStoryModalOpen) return;
 
     // Suporte adicional a setas / WASD para mover a câmera caso jogue no computador
     const camSpeed = 0.42 * deltaMs;

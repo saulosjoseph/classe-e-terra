@@ -6,6 +6,7 @@ import {
   CITY_RADIUS,
   FLORESTA_OUTER_RADIUS,
   FLORESTA_OUTER_RADIUS_Y,
+  GAME_HEIGHT,
   GAME_WIDTH,
   HUD_BOTTOM_HEIGHT,
   HUD_TOP_HEIGHT,
@@ -84,6 +85,7 @@ export class UIScene extends Phaser.Scene {
     this.createMapNavigationOverlay();
     this.createBottomThumbPanel();
     this.createPhaseBanner();
+    this.createStoryModal();
 
     this.gameScene.phaseSystem.on(
       'phase-changed',
@@ -259,6 +261,24 @@ export class UIScene extends Phaser.Scene {
 
     btnZoomOut.on('pointerdown', () => {
       this.gameScene.zoomOut();
+    });
+
+    const btnStory = this.add
+      .text(336, MAP_BOTTOM_Y - 26, '📜 HISTÓRIA', {
+        fontFamily: 'Courier New, monospace',
+        fontSize: '10px',
+        fontStyle: 'bold',
+        color: '#fef08a',
+        backgroundColor: '#14532ddd',
+        padding: { x: 6, y: 4 }
+      })
+      .setInteractive({ useHandCursor: true })
+      .setDepth(80);
+
+    btnStory.on('pointerdown', () => {
+      SoundManager.unlock();
+      SoundManager.playSelect();
+      this.createStoryModal();
     });
 
     const btnFullscreen = this.add
@@ -616,6 +636,122 @@ export class UIScene extends Phaser.Scene {
       delay: 3400,
       duration: 600
     });
+  }
+
+  public createStoryModal(): void {
+    if (this.gameScene) {
+      this.gameScene.isStoryModalOpen = true;
+    }
+
+    const storyText =
+      'A floresta está queimando e o Velho Estado se mostra incapaz de resolver a situação — seja devido a uma política de ajuste fiscal que privilegia o mercado financeiro e impede investimentos estruturais e de pessoal, seja por se alinhar aos interesses do agronegócio e de empreiteiras que veem no fogo uma oportunidade de expandir as fronteiras de seus negócios. Diante desse cenário, o povo está na linha de frente do combate: sem equipamentos, sem EPIs e sem treinamento. Em meio a isso, os setores mais avançados da população se organizam em brigadas voluntárias, mas sofrem com limitação de recursos e ausência de apoio do Velho Estado.';
+
+    const modalContainer = this.add.container(0, 0).setDepth(200);
+
+    // Fundo escuro semitransparente que bloqueia toques no jogo ao fundo
+    const backdrop = this.add
+      .rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.82)
+      .setInteractive();
+
+    const boxW = 630;
+    const boxH = 300;
+    const boxX = GAME_WIDTH / 2;
+    const boxY = GAME_HEIGHT / 2;
+
+    const boxBg = this.add
+      .rectangle(boxX, boxY, boxW, boxH, 0x090d0a, 0.98)
+      .setStrokeStyle(2.5, 0xfacc15);
+
+    const innerBorder = this.add
+      .rectangle(boxX, boxY, boxW - 10, boxH - 10, 0x000000, 0)
+      .setStrokeStyle(1, 0x15803d);
+
+    // const titleBadge = this.add
+    //   .text(boxX, boxY - boxH / 2 + 25, '✊ CONTEXTO HISTÓRICO • A LUTA NO TAPAJÓS', {
+    //     fontFamily: 'Courier New, monospace',
+    //     fontSize: '13px',
+    //     fontStyle: 'bold',
+    //     color: '#fde047'
+    //   })
+    //   .setOrigin(0.5);
+
+    const divider = this.add.graphics();
+    divider.lineStyle(1, 0x3f3f46, 0.8);
+    divider.lineBetween(
+      boxX - boxW / 2 + 24,
+      boxY - boxH / 2 + 42,
+      boxX + boxW / 2 - 24,
+      boxY - boxH / 2 + 42
+    );
+
+    const contentText = this.add
+      .text(boxX, boxY - 14, storyText, {
+        fontFamily: 'Courier New, monospace',
+        fontSize: '11px',
+        color: '#f4f4f5',
+        align: 'left',
+        lineSpacing: 4.5,
+        wordWrap: { width: boxW - 52 }
+      })
+      .setOrigin(0.5);
+
+    const btnW = 260;
+    const btnH = 38;
+    const btnY = boxY + boxH / 2 - 32;
+
+    const startBtn = this.add
+      .rectangle(boxX, btnY, btnW, btnH, 0x16a34a, 1)
+      .setStrokeStyle(2, 0x86efac)
+      .setInteractive({ useHandCursor: true });
+
+    const btnText = this.add
+      .text(boxX, btnY, 'Ok', {
+        fontFamily: 'Courier New, monospace',
+        fontSize: '12px',
+        fontStyle: 'bold',
+        color: '#052e16'
+      })
+      .setOrigin(0.5);
+
+    this.tweens.add({
+      targets: [startBtn, btnText],
+      scaleX: 1.03,
+      scaleY: 1.03,
+      yoyo: true,
+      repeat: -1,
+      duration: 650
+    });
+
+    const closeModal = () => {
+      SoundManager.unlock();
+      SoundManager.playPhaseUp();
+      if (this.gameScene) {
+        this.gameScene.isStoryModalOpen = false;
+      }
+
+      this.tweens.add({
+        targets: modalContainer,
+        alpha: 0,
+        duration: 250,
+        onComplete: () => {
+          modalContainer.destroy();
+        }
+      });
+    };
+
+    startBtn.on('pointerdown', closeModal);
+    backdrop.on('pointerdown', closeModal);
+
+    modalContainer.add([
+      backdrop,
+      boxBg,
+      innerBorder,
+      // titleBadge,
+      divider,
+      contentText,
+      startBtn,
+      btnText
+    ]);
   }
 
   public override update(): void {

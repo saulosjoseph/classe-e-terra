@@ -34,18 +34,38 @@ export class Brigadista extends Unit {
       scene,
       id,
       isComunitario ? UnitType.BRIGADISTA_COMUNITARIO : UnitType.BRIGADA_VOLUNTARIA,
-      isComunitario ? 'unit_brigadista' : 'unit_voluntario',
+      isComunitario ? 'unit_brigadista' : 'brigadista_voluntario',
       x,
       y
     );
     this.unitIndex = unitIndex;
     this.applyRoleStats(isComunitario);
+    this.setupVisuals(isComunitario);
+  }
+
+  private setupVisuals(isComunitario: boolean): void {
+    if (!isComunitario) {
+      this.sprite.setScale(0.48);
+      this.sprite.setOrigin(0.5, 0.875);
+      this.statusBarOffsetY = 38;
+      if (this.scene.anims.exists('brigadista_voluntario_idle')) {
+        this.sprite.play('brigadista_voluntario_idle');
+      }
+    } else {
+      this.sprite.setScale(1.0);
+      this.sprite.setOrigin(0.5, 0.88);
+      this.statusBarOffsetY = 28;
+    }
   }
 
   public evolveToComunitario(): void {
     if (this.unitType === UnitType.BRIGADISTA_COMUNITARIO) return;
     this.unitType = UnitType.BRIGADISTA_COMUNITARIO;
+    this.sprite.stop();
     this.sprite.setTexture('unit_brigadista');
+    this.sprite.setScale(1.0);
+    this.sprite.setOrigin(0.5, 0.88);
+    this.statusBarOffsetY = 28;
     this.applyRoleStats(true);
     this.stamina = this.maxStamina;
   }
@@ -147,7 +167,8 @@ export class Brigadista extends Unit {
     this.moveStep(deltaMs, smokeAtPos);
 
     // Combate automático ao fogo quando encosta no foco
-    if (targetFire && nearestDist <= 46) {
+    const isExtinguishing = Boolean(targetFire && nearestDist <= 46);
+    if (isExtinguishing && targetFire) {
       const fatigueFactor = this.stamina > 18 ? 1.0 : 0.45;
       const boostFactor = this.hasEquipmentBoost() ? 1.55 : 1.0;
       const power = this.extinguishPower * fatigueFactor * boostFactor * dtSec;
@@ -160,6 +181,9 @@ export class Brigadista extends Unit {
       this.stamina = Math.min(this.maxStamina, this.stamina + regenRate * dtSec);
     }
 
+    // Gerencia animações do Brigadista Voluntário (idle, caminhada e combate ao fogo)
+    this.updateAnimation(isExtinguishing, targetFire);
+
     // Fase 6: Se estiver cercando a Fortaleza do Burguês, causa dano contínuo
     if (boss && boss.isActive()) {
       const distBoss = getIsoDistance(this.x, this.y, boss.x, boss.y);
@@ -169,5 +193,27 @@ export class Brigadista extends Unit {
     }
 
     this.drawOverlays();
+  }
+
+  private updateAnimation(isExtinguishing: boolean, targetFire: ActiveFireInstance | null): void {
+    if (this.unitType !== UnitType.BRIGADA_VOLUNTARIA) return;
+
+    if (isExtinguishing && targetFire) {
+      // Direciona o soprador para o foco de incêndio
+      if (Math.abs(targetFire.data.x - this.x) > 2) {
+        this.sprite.setFlipX(targetFire.data.x < this.x);
+      }
+      if (this.sprite.anims.currentAnim?.key !== 'brigadista_voluntario_extinguish') {
+        this.sprite.play('brigadista_voluntario_extinguish', true);
+      }
+    } else if (this.isMoving()) {
+      if (this.sprite.anims.currentAnim?.key !== 'brigadista_voluntario_walk') {
+        this.sprite.play('brigadista_voluntario_walk', true);
+      }
+    } else {
+      if (this.sprite.anims.currentAnim?.key !== 'brigadista_voluntario_idle') {
+        this.sprite.play('brigadista_voluntario_idle', true);
+      }
+    }
   }
 }

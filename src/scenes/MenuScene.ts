@@ -150,7 +150,7 @@ export class MenuScene extends Phaser.Scene {
       .setInteractive({ useHandCursor: true });
 
     const startTxt = this.add
-      .text(rightX, 316, '✊ INICIAR RESISTÊNCIA', {
+      .text(rightX, 316, 'INICIAR', {
         fontFamily: 'Courier New, monospace',
         fontSize: '17px',
         fontStyle: 'bold',
