@@ -23,14 +23,23 @@ export const MAP_TOP_Y = HUD_TOP_HEIGHT;
 export const MAP_BOTTOM_Y = GAME_HEIGHT - HUD_BOTTOM_HEIGHT; // 323
 export const MAP_VIEWPORT_HEIGHT = MAP_BOTTOM_Y - MAP_TOP_Y; // 269
 
-export const WORLD_WIDTH = 1800;
-export const WORLD_HEIGHT = 1800;
-export const WORLD_CENTER_X = WORLD_WIDTH / 2; // 900
-export const WORLD_CENTER_Y = WORLD_HEIGHT / 2; // 900
+export const WORLD_WIDTH = 8000;
+export const WORLD_HEIGHT = 8000;
+export const WORLD_CENTER_X = WORLD_WIDTH / 2; // 4000
+export const WORLD_CENTER_Y = WORLD_HEIGHT / 2; // 4000
 
-export const CITY_RADIUS = 250;
-export const CAMPO_RADIUS = 520;
-export const FLORESTA_OUTER_RADIUS = 840;
+/** Proporção dimétrica 2:1 da Visão Isométrica clássica (RTS / Pixel Art) */
+export const ISO_Y_RATIO = 0.5;
+export const ISO_INVERSE_Y_RATIO = 2.0;
+
+/** Cidade quadruplicada em tamanho (raio de 1840px / diâmetro de 3680x1840px) */
+export const CITY_RADIUS = 1840;
+export const CAMPO_RADIUS = 2800;
+export const FLORESTA_OUTER_RADIUS = 3800;
+
+export const CITY_RADIUS_Y = CITY_RADIUS * ISO_Y_RATIO; // 920
+export const CAMPO_RADIUS_Y = CAMPO_RADIUS * ISO_Y_RATIO; // 1400
+export const FLORESTA_OUTER_RADIUS_Y = FLORESTA_OUTER_RADIUS * ISO_Y_RATIO; // 1900
 
 export const SECTOR_INFO: Record<
   SectorType,
@@ -56,10 +65,28 @@ export const SECTOR_INFO: Record<
   }
 };
 
+/**
+ * Métrica de distância do losango/quadrado isométrico 2:1 ao centro do mundo.
+ * Produz contornos perfeitamente quadrados no solo em perspectiva isométrica.
+ */
+export function getIsoSquareDist(x: number, y: number): number {
+  return Math.abs(x - WORLD_CENTER_X) + Math.abs(y - WORLD_CENTER_Y) * ISO_INVERSE_Y_RATIO;
+}
+
+/**
+ * Distância euclidiana no plano do solo isométrico (desfaz a compressão de 0.5 no eixo Y).
+ */
+export function getIsoDistance(x1: number, y1: number, x2: number, y2: number): number {
+  const dx = x2 - x1;
+  const dy = (y2 - y1) * ISO_INVERSE_Y_RATIO;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+/**
+ * Identifica em qual setor quadrado isométrico (Cidade, Campo ou Floresta) o ponto (x, y) se encontra.
+ */
 export function getSectorAtPoint(x: number, y: number): SectorType {
-  const dx = x - WORLD_CENTER_X;
-  const dy = y - WORLD_CENTER_Y;
-  const dist = Math.sqrt(dx * dx + dy * dy);
+  const dist = getIsoSquareDist(x, y);
   if (dist <= CITY_RADIUS) {
     return SectorType.CIDADE;
   }
@@ -69,16 +96,36 @@ export function getSectorAtPoint(x: number, y: number): SectorType {
   return SectorType.FLORESTA;
 }
 
+/**
+ * Sorteia uma coordenada (x, y) no plano do solo dentro da zona quadrada isométrica do setor.
+ */
 export function getRandomPointInSector(sector: SectorType, margin = 24): { x: number; y: number } {
   const info = SECTOR_INFO[sector];
   const minR = sector === SectorType.CIDADE ? 0 : info.minRadius + margin;
   const maxR = info.maxRadius - margin;
-  const angle = Math.random() * Math.PI * 2;
-  const r = minR + Math.random() * Math.max(10, maxR - minR);
-  return {
-    x: Math.round(WORLD_CENTER_X + Math.cos(angle) * r),
-    y: Math.round(WORLD_CENTER_Y + Math.sin(angle) * r)
-  };
+
+  const d = minR + Math.random() * Math.max(10, maxR - minR);
+  const side = Math.floor(Math.random() * 4);
+  const t = Math.random() * 2 - 1; // [-1, 1]
+  let u = 0;
+  let v = 0;
+  if (side === 0) {
+    u = 1;
+    v = t;
+  } else if (side === 1) {
+    u = -1;
+    v = t;
+  } else if (side === 2) {
+    u = t;
+    v = 1;
+  } else {
+    u = t;
+    v = -1;
+  }
+
+  const x = Math.round(WORLD_CENTER_X + (u - v) * (d / 2));
+  const y = Math.round(WORLD_CENTER_Y + (u + v) * ((d * ISO_Y_RATIO) / 2));
+  return { x, y };
 }
 
 /**

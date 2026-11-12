@@ -1,6 +1,8 @@
 import Phaser from 'phaser';
 import {
   FLORESTA_OUTER_RADIUS,
+  ISO_INVERSE_Y_RATIO,
+  ISO_Y_RATIO,
   WORLD_CENTER_X,
   WORLD_CENTER_Y,
   getRandomPointInSector
@@ -37,9 +39,14 @@ export class SpawnerSystem extends Phaser.Events.EventEmitter {
           : SectorType.CIDADE);
 
     const targetPt = getRandomPointInSector(sector, 32);
-    const angle = Math.atan2(targetPt.y - WORLD_CENTER_Y, targetPt.x - WORLD_CENTER_X);
-    const spawnX = Math.round(WORLD_CENTER_X + Math.cos(angle) * (FLORESTA_OUTER_RADIUS - 14));
-    const spawnY = Math.round(WORLD_CENTER_Y + Math.sin(angle) * (FLORESTA_OUTER_RADIUS - 14));
+    const angle = Math.atan2(
+      (targetPt.y - WORLD_CENTER_Y) * ISO_INVERSE_Y_RATIO,
+      targetPt.x - WORLD_CENTER_X
+    );
+    const spawnX = Math.round(WORLD_CENTER_X + Math.cos(angle) * (FLORESTA_OUTER_RADIUS - 16));
+    const spawnY = Math.round(
+      WORLD_CENTER_Y + Math.sin(angle) * ((FLORESTA_OUTER_RADIUS - 16) * ISO_Y_RATIO)
+    );
 
     const arsonist = new Incendiario(
       this.scene,

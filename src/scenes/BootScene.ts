@@ -6,6 +6,10 @@ export class BootScene extends Phaser.Scene {
     super('BootScene');
   }
 
+  public preload(): void {
+    this.load.image('prefeitura', 'assets/prefeitura.png');
+  }
+
   public create(): void {
     PixelArtGenerator.generateAll(this);
     this.scene.start('MenuScene');

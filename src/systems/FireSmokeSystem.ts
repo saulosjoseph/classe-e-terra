@@ -1,12 +1,17 @@
 import Phaser from 'phaser';
 import {
   CAMPO_RADIUS,
+  CAMPO_RADIUS_Y,
   FLORESTA_OUTER_RADIUS,
+  ISO_INVERSE_Y_RATIO,
+  ISO_Y_RATIO,
   SMOKE_PALETTE,
   WORLD_CENTER_X,
   WORLD_CENTER_Y,
   WORLD_HEIGHT,
   WORLD_WIDTH,
+  getIsoDistance,
+  getIsoSquareDist,
   getSectorAtPoint
 } from '../config/GameBalance';
 import { FireNodeData, SectorType } from '../types/GameTypes';
@@ -50,17 +55,15 @@ export class FireSmokeSystem extends Phaser.Events.EventEmitter {
   public spawnFire(x: number, y: number, initialIntensity = 18): ActiveFireInstance | null {
     if (this.fires.size >= 18) return null;
 
-    // Mantém o foco dentro do raio máximo do território da Floresta
-    const dx = x - WORLD_CENTER_X;
-    const dy = y - WORLD_CENTER_Y;
-    const distFromCenter = Math.sqrt(dx * dx + dy * dy);
+    // Mantém o foco dentro da zona quadrada isométrica do território da Floresta
     let clampedX = Phaser.Math.Clamp(x, 60, WORLD_WIDTH - 60);
     let clampedY = Phaser.Math.Clamp(y, 60, WORLD_HEIGHT - 60);
+    const sqDist = getIsoSquareDist(clampedX, clampedY);
 
-    if (distFromCenter > FLORESTA_OUTER_RADIUS - 30) {
-      const ang = Math.atan2(dy, dx);
-      clampedX = WORLD_CENTER_X + Math.cos(ang) * (FLORESTA_OUTER_RADIUS - 36);
-      clampedY = WORLD_CENTER_Y + Math.sin(ang) * (FLORESTA_OUTER_RADIUS - 36);
+    if (sqDist > FLORESTA_OUTER_RADIUS - 30) {
+      const factor = (FLORESTA_OUTER_RADIUS - 36) / Math.max(1, sqDist);
+      clampedX = Math.round(WORLD_CENTER_X + (clampedX - WORLD_CENTER_X) * factor);
+      clampedY = Math.round(WORLD_CENTER_Y + (clampedY - WORLD_CENTER_Y) * factor);
     }
 
     if (this.isProtectedByFirebreak(clampedX, clampedY)) {
@@ -68,7 +71,7 @@ export class FireSmokeSystem extends Phaser.Events.EventEmitter {
     }
 
     for (const existing of this.fires.values()) {
-      if (Phaser.Math.Distance.Between(clampedX, clampedY, existing.data.x, existing.data.y) < 42) {
+      if (getIsoDistance(clampedX, clampedY, existing.data.x, existing.data.y) < 42) {
         existing.data.intensity = Math.min(100, existing.data.intensity + 15);
         return existing;
       }
@@ -76,19 +79,22 @@ export class FireSmokeSystem extends Phaser.Events.EventEmitter {
 
     const sector = getSectorAtPoint(clampedX, clampedY);
     const id = `fire_${this.nextId++}`;
+    const yDepth = 20 + Math.floor(clampedY);
 
     const smokeSprite = this.scene.add
-      .sprite(clampedX, clampedY - 12, 'smoke_1')
-      .setDepth(28)
+      .sprite(clampedX, clampedY - 22, 'smoke_1')
+      .setOrigin(0.5, 0.8)
+      .setDepth(yDepth + 5)
       .setScale(1.3)
       .setAlpha(SMOKE_PALETTE[1].alpha);
 
     const fireSprite = this.scene.add
       .sprite(clampedX, clampedY, 'fire_node')
-      .setDepth(22)
+      .setOrigin(0.5, 0.9)
+      .setDepth(yDepth)
       .setScale(0.95);
 
-    const ringGraphics = this.scene.add.graphics().setDepth(21);
+    const ringGraphics = this.scene.add.graphics().setDepth(16 + Math.floor(clampedY));
 
     const hitZone = this.scene.add
       .zone(clampedX, clampedY, 56, 56)
@@ -159,15 +165,27 @@ export class FireSmokeSystem extends Phaser.Events.EventEmitter {
   }
 
   /**
-   * Cria um Aceiro Circular (trincheira agrícola protetora entre a Floresta e o Campo)
+   * Cria um Aceiro Quadrado Isométrico (trincheira agrícola protetora entre a Floresta e o Campo)
    */
   public addFirebreakRing(ringRadius = CAMPO_RADIUS, durationMs = 18000): void {
+    const ry = ringRadius * ISO_Y_RATIO;
     const g = this.scene.add.graphics().setDepth(12);
-    g.lineStyle(22, 0x78350f, 0.62);
-    g.strokeCircle(WORLD_CENTER_X, WORLD_CENTER_Y, ringRadius);
+
+    const drawDiamond = (radX: number, radY: number) => {
+      g.beginPath();
+      g.moveTo(WORLD_CENTER_X, WORLD_CENTER_Y - radY);
+      g.lineTo(WORLD_CENTER_X + radX, WORLD_CENTER_Y);
+      g.lineTo(WORLD_CENTER_X, WORLD_CENTER_Y + radY);
+      g.lineTo(WORLD_CENTER_X - radX, WORLD_CENTER_Y);
+      g.closePath();
+      g.strokePath();
+    };
+
+    g.lineStyle(18, 0x78350f, 0.65);
+    drawDiamond(ringRadius, ry);
     g.lineStyle(2, 0xfacc15, 0.85);
-    g.strokeCircle(WORLD_CENTER_X, WORLD_CENTER_Y, ringRadius - 11);
-    g.strokeCircle(WORLD_CENTER_X, WORLD_CENTER_Y, ringRadius + 11);
+    drawDiamond(ringRadius - 9, (ringRadius - 9) * ISO_Y_RATIO);
+    drawDiamond(ringRadius + 9, (ringRadius + 9) * ISO_Y_RATIO);
 
     this.firebreaks.push({
       ringRadius,
@@ -186,7 +204,7 @@ export class FireSmokeSystem extends Phaser.Events.EventEmitter {
   }
 
   public isProtectedByFirebreak(x: number, y: number): boolean {
-    const dist = Phaser.Math.Distance.Between(x, y, WORLD_CENTER_X, WORLD_CENTER_Y);
+    const dist = getIsoSquareDist(x, y);
     for (const fb of this.firebreaks) {
       if (Math.abs(dist - fb.ringRadius) <= fb.thickness) {
         return true;
@@ -213,7 +231,7 @@ export class FireSmokeSystem extends Phaser.Events.EventEmitter {
   public getSmokeLevelAtPoint(x: number, y: number): number {
     let highest = 0;
     for (const inst of this.fires.values()) {
-      const dist = Phaser.Math.Distance.Between(x, y, inst.data.x, inst.data.y);
+      const dist = getIsoDistance(x, y, inst.data.x, inst.data.y);
       const smokeRadius = 35 + inst.data.smokeLevel * 18;
       if (dist <= smokeRadius) {
         highest = Math.max(highest, inst.data.smokeLevel);
@@ -273,7 +291,7 @@ export class FireSmokeSystem extends Phaser.Events.EventEmitter {
       totalForestDamage += (inst.data.intensity / 100) * 0.85 * sectorWeight * sectorMult * dtSec;
     }
 
-    // Propagação geométrica (tende a avançar da Floresta em direção ao Campo e à Cidade no centro!)
+    // Propagação geométrica no plano do solo isométrico (avança em direção à Cidade no centro)
     this.spreadTimer += deltaMs;
     if (this.spreadTimer >= 3800) {
       this.spreadTimer = 0;
@@ -283,17 +301,15 @@ export class FireSmokeSystem extends Phaser.Events.EventEmitter {
           const chance =
             inst.data.sector === SectorType.FLORESTA && indigenousDemarcationActive ? 0.22 : 0.42;
           if (Math.random() < chance) {
-            const angleToCity = Phaser.Math.Angle.Between(
-              inst.data.x,
-              inst.data.y,
-              WORLD_CENTER_X,
-              WORLD_CENTER_Y
+            const groundAngleToCity = Math.atan2(
+              (WORLD_CENTER_Y - inst.data.y) * ISO_INVERSE_Y_RATIO,
+              WORLD_CENTER_X - inst.data.x
             );
-            const spreadAngle = angleToCity + Phaser.Math.FloatBetween(-0.95, 0.95);
+            const spreadAngle = groundAngleToCity + Phaser.Math.FloatBetween(-0.95, 0.95);
             const dist = Phaser.Math.Between(55, 92);
             this.spawnFire(
               inst.data.x + Math.cos(spreadAngle) * dist,
-              inst.data.y + Math.sin(spreadAngle) * dist,
+              inst.data.y + Math.sin(spreadAngle) * (dist * ISO_Y_RATIO),
               22
             );
           }
@@ -306,7 +322,9 @@ export class FireSmokeSystem extends Phaser.Events.EventEmitter {
 
   private updateFireVisuals(inst: ActiveFireInstance): void {
     const norm = inst.data.intensity / 100;
-    inst.fireSprite.setScale(0.75 + norm * 0.75);
+    const yDepth = 20 + Math.floor(inst.data.y);
+
+    inst.fireSprite.setScale(0.8 + norm * 0.75).setDepth(yDepth);
 
     const smokeKey = `smoke_${inst.data.smokeLevel}`;
     if (inst.smokeSprite.texture.key !== smokeKey) {
@@ -315,20 +333,22 @@ export class FireSmokeSystem extends Phaser.Events.EventEmitter {
     const smokeCfg = SMOKE_PALETTE[inst.data.smokeLevel];
     inst.smokeSprite.setAlpha(smokeCfg.alpha);
     inst.smokeSprite.setScale(1.2 + inst.data.smokeLevel * 0.52);
+    inst.smokeSprite.setPosition(inst.data.x, inst.data.y - 22).setDepth(yDepth + 5);
 
     inst.ringGraphics.clear();
+    inst.ringGraphics.setDepth(16 + Math.floor(inst.data.y));
     const smokeRadius = 24 + inst.data.smokeLevel * 14;
-    inst.ringGraphics.fillStyle(smokeCfg.color, smokeCfg.alpha * 0.45);
-    inst.ringGraphics.fillCircle(inst.data.x, inst.data.y, smokeRadius);
+    inst.ringGraphics.fillStyle(smokeCfg.color, smokeCfg.alpha * 0.42);
+    inst.ringGraphics.fillEllipse(inst.data.x, inst.data.y, smokeRadius * 2, smokeRadius, 24);
 
     const barW = 28;
     const barH = 4;
     inst.ringGraphics.fillStyle(0x09090b, 0.85);
-    inst.ringGraphics.fillRect(inst.data.x - barW / 2, inst.data.y + 14, barW, barH);
+    inst.ringGraphics.fillRect(inst.data.x - barW / 2, inst.data.y + 6, barW, barH);
     inst.ringGraphics.fillStyle(0xef4444, 1);
     inst.ringGraphics.fillRect(
       inst.data.x - barW / 2,
-      inst.data.y + 14,
+      inst.data.y + 6,
       (barW * inst.data.intensity) / 100,
       barH
     );

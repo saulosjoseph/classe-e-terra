@@ -1,8 +1,11 @@
 import Phaser from 'phaser';
 import {
   FLORESTA_OUTER_RADIUS,
+  ISO_INVERSE_Y_RATIO,
+  ISO_Y_RATIO,
   WORLD_CENTER_X,
-  WORLD_CENTER_Y
+  WORLD_CENTER_Y,
+  getIsoDistance
 } from '../config/GameBalance';
 import { FireSmokeSystem } from '../systems/FireSmokeSystem';
 
@@ -15,6 +18,7 @@ export class Incendiario extends Phaser.Events.EventEmitter {
   public x: number;
   public y: number;
   public sprite: Phaser.GameObjects.Sprite;
+  public shadowSprite: Phaser.GameObjects.Sprite;
   public alertBadge: Phaser.GameObjects.Text;
   public hitZone: Phaser.GameObjects.Zone;
 
@@ -44,13 +48,19 @@ export class Incendiario extends Phaser.Events.EventEmitter {
     this.targetX = targetX;
     this.targetY = targetY;
 
-    const escapeAngle = Math.atan2(spawnY - WORLD_CENTER_Y, spawnX - WORLD_CENTER_X);
-    this.escapeX = WORLD_CENTER_X + Math.cos(escapeAngle) * (FLORESTA_OUTER_RADIUS + 40);
-    this.escapeY = WORLD_CENTER_Y + Math.sin(escapeAngle) * (FLORESTA_OUTER_RADIUS + 40);
+    const escapeAngle = Math.atan2((spawnY - WORLD_CENTER_Y) * ISO_INVERSE_Y_RATIO, spawnX - WORLD_CENTER_X);
+    this.escapeX = WORLD_CENTER_X + Math.cos(escapeAngle) * (FLORESTA_OUTER_RADIUS + 50);
+    this.escapeY = WORLD_CENTER_Y + Math.sin(escapeAngle) * ((FLORESTA_OUTER_RADIUS + 50) * ISO_Y_RATIO);
 
-    this.sprite = scene.add.sprite(spawnX, spawnY, 'enemy_incendiario').setDepth(24);
+    this.shadowSprite = scene.add.sprite(spawnX, spawnY, 'unit_shadow').setOrigin(0.5, 0.5).setDepth(18);
+
+    this.sprite = scene.add
+      .sprite(spawnX, spawnY, 'enemy_incendiario')
+      .setOrigin(0.5, 0.88)
+      .setDepth(20 + Math.floor(spawnY));
+
     this.alertBadge = scene.add
-      .text(spawnX, spawnY - 20, '!', {
+      .text(spawnX, spawnY - 26, '!', {
         fontFamily: 'Courier New, monospace',
         fontSize: '13px',
         fontStyle: 'bold',
@@ -59,7 +69,7 @@ export class Incendiario extends Phaser.Events.EventEmitter {
         padding: { x: 3, y: 1 }
       })
       .setOrigin(0.5)
-      .setDepth(30);
+      .setDepth(30 + Math.floor(spawnY));
 
     this.hitZone = scene.add
       .zone(spawnX, spawnY, 54, 54)
@@ -82,11 +92,15 @@ export class Incendiario extends Phaser.Events.EventEmitter {
     const dtSec = deltaMs / 1000;
 
     if (!this.hasIgnited) {
-      const dist = Phaser.Math.Distance.Between(this.x, this.y, this.targetX, this.targetY);
+      const dist = getIsoDistance(this.x, this.y, this.targetX, this.targetY);
       if (dist > 6) {
-        const angle = Phaser.Math.Angle.Between(this.x, this.y, this.targetX, this.targetY);
-        this.x += Math.cos(angle) * this.speed * dtSec;
-        this.y += Math.sin(angle) * this.speed * dtSec;
+        const groundAngle = Math.atan2(
+          (this.targetY - this.y) * ISO_INVERSE_Y_RATIO,
+          this.targetX - this.x
+        );
+        this.x += Math.cos(groundAngle) * this.speed * dtSec;
+        this.y += Math.sin(groundAngle) * this.speed * dtSec * ISO_Y_RATIO;
+        this.sprite.setFlipX(Math.cos(groundAngle) < 0);
       } else {
         // Ateando fogo no ponto cego
         this.igniteWarmupMs -= deltaMs;
@@ -99,18 +113,24 @@ export class Incendiario extends Phaser.Events.EventEmitter {
       }
     } else {
       // Tenta fugir pelas bordas após atear fogo
-      const distEscape = Phaser.Math.Distance.Between(this.x, this.y, this.escapeX, this.escapeY);
-      if (distEscape <= 10) {
+      const distEscape = getIsoDistance(this.x, this.y, this.escapeX, this.escapeY);
+      if (distEscape <= 12) {
         this.destroy();
         return;
       }
-      const angle = Phaser.Math.Angle.Between(this.x, this.y, this.escapeX, this.escapeY);
-      this.x += Math.cos(angle) * (this.speed * 1.18) * dtSec;
-      this.y += Math.sin(angle) * (this.speed * 1.18) * dtSec;
+      const groundAngle = Math.atan2(
+        (this.escapeY - this.y) * ISO_INVERSE_Y_RATIO,
+        this.escapeX - this.x
+      );
+      this.x += Math.cos(groundAngle) * (this.speed * 1.18) * dtSec;
+      this.y += Math.sin(groundAngle) * (this.speed * 1.18) * dtSec * ISO_Y_RATIO;
+      this.sprite.setFlipX(Math.cos(groundAngle) < 0);
     }
 
-    this.sprite.setPosition(this.x, this.y);
-    this.alertBadge.setPosition(this.x, this.y - 20);
+    const yDepth = 20 + Math.floor(this.y);
+    this.sprite.setPosition(this.x, this.y).setDepth(yDepth);
+    this.shadowSprite.setPosition(this.x, this.y);
+    this.alertBadge.setPosition(this.x, this.y - 28).setDepth(yDepth + 1);
     this.hitZone.setPosition(this.x, this.y);
   }
 
@@ -118,6 +138,7 @@ export class Incendiario extends Phaser.Events.EventEmitter {
     if (!this.alive) return;
     this.alive = false;
     this.sprite.destroy();
+    this.shadowSprite.destroy();
     this.alertBadge.destroy();
     this.hitZone.destroy();
   }

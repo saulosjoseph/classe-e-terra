@@ -2,11 +2,14 @@ import Phaser from 'phaser';
 import {
   BALANCE,
   CAMPO_RADIUS,
+  CAMPO_RADIUS_Y,
   CITY_RADIUS,
   FLORESTA_OUTER_RADIUS,
+  FLORESTA_OUTER_RADIUS_Y,
   GAME_WIDTH,
   HUD_BOTTOM_HEIGHT,
   HUD_TOP_HEIGHT,
+  ISO_Y_RATIO,
   MAP_BOTTOM_Y,
   MAP_TOP_Y,
   MAP_VIEWPORT_HEIGHT,
@@ -163,7 +166,7 @@ export class UIScene extends Phaser.Scene {
       const nx = (pointer.x - this.minimapX) / this.minimapRadius;
       const ny = (pointer.y - this.minimapY) / this.minimapRadius;
       const wx = WORLD_CENTER_X + nx * FLORESTA_OUTER_RADIUS;
-      const wy = WORLD_CENTER_Y + ny * FLORESTA_OUTER_RADIUS;
+      const wy = WORLD_CENTER_Y + ny * FLORESTA_OUTER_RADIUS_Y;
       this.gameScene.centerCameraOnPoint(wx, wy, true);
     });
 
@@ -220,10 +223,42 @@ export class UIScene extends Phaser.Scene {
       } else {
         this.gameScene.centerCameraOnPoint(
           WORLD_CENTER_X,
-          WORLD_CENTER_Y + CAMPO_RADIUS + 80,
+          WORLD_CENTER_Y + CAMPO_RADIUS_Y + 40,
           true
         );
       }
+    });
+
+    const btnZoomIn = this.add
+      .text(244, MAP_BOTTOM_Y - 26, '🔍 +', {
+        fontFamily: 'Courier New, monospace',
+        fontSize: '10px',
+        fontStyle: 'bold',
+        color: '#ffffff',
+        backgroundColor: '#1e3a8add',
+        padding: { x: 7, y: 4 }
+      })
+      .setInteractive({ useHandCursor: true })
+      .setDepth(80);
+
+    btnZoomIn.on('pointerdown', () => {
+      this.gameScene.zoomIn();
+    });
+
+    const btnZoomOut = this.add
+      .text(290, MAP_BOTTOM_Y - 26, '🔍 -', {
+        fontFamily: 'Courier New, monospace',
+        fontSize: '10px',
+        fontStyle: 'bold',
+        color: '#ffffff',
+        backgroundColor: '#1e3a8add',
+        padding: { x: 7, y: 4 }
+      })
+      .setInteractive({ useHandCursor: true })
+      .setDepth(80);
+
+    btnZoomOut.on('pointerdown', () => {
+      this.gameScene.zoomOut();
     });
 
     const btnFullscreen = this.add
@@ -712,20 +747,30 @@ export class UIScene extends Phaser.Scene {
     const r = this.minimapRadius;
     const scale = r / FLORESTA_OUTER_RADIUS;
 
-    g.fillStyle(0x090d0a, 0.88);
-    g.fillCircle(mx, my, r + 3);
+    // Fundo e setores quadrados isométricos (losangos 2:1)
+    const drawMiniDiamond = (radius: number, fillHex?: number, strokeHex?: number) => {
+      const rx = radius * scale;
+      const ry = rx * ISO_Y_RATIO;
+      g.beginPath();
+      g.moveTo(mx, my - ry);
+      g.lineTo(mx + rx, my);
+      g.lineTo(mx, my + ry);
+      g.lineTo(mx - rx, my);
+      g.closePath();
+      if (fillHex !== undefined) {
+        g.fillStyle(fillHex, 0.95);
+        g.fillPath();
+      }
+      if (strokeHex !== undefined) {
+        g.lineStyle(1.5, strokeHex, 0.85);
+        g.strokePath();
+      }
+    };
 
-    g.fillStyle(0x064e3b, 0.95);
-    g.fillCircle(mx, my, FLORESTA_OUTER_RADIUS * scale);
-
-    g.fillStyle(0x3f6212, 0.95);
-    g.fillCircle(mx, my, CAMPO_RADIUS * scale);
-
-    g.fillStyle(0x92400e, 0.95);
-    g.fillCircle(mx, my, CITY_RADIUS * scale);
-
-    g.lineStyle(1, 0xa1a1aa, 0.6);
-    g.strokeCircle(mx, my, r + 2);
+    drawMiniDiamond(FLORESTA_OUTER_RADIUS + 30, 0x090d0a, 0xa1a1aa);
+    drawMiniDiamond(FLORESTA_OUTER_RADIUS, 0x064e3b);
+    drawMiniDiamond(CAMPO_RADIUS, 0x3f6212);
+    drawMiniDiamond(CITY_RADIUS, 0x92400e, 0xfef08a);
 
     for (const f of this.gameScene.fireSystem.getActiveFires()) {
       const fx = mx + (f.data.x - WORLD_CENTER_X) * scale;
@@ -749,10 +794,10 @@ export class UIScene extends Phaser.Scene {
     }
 
     const cam = this.gameScene.cameras.main;
-    const rx = mx + (cam.scrollX - WORLD_CENTER_X) * scale;
-    const ry = my + (cam.scrollY - WORLD_CENTER_Y) * scale;
-    const rw = GAME_WIDTH * scale;
-    const rh = MAP_VIEWPORT_HEIGHT * scale;
+    const rw = (GAME_WIDTH / cam.zoom) * scale;
+    const rh = (MAP_VIEWPORT_HEIGHT / cam.zoom) * scale;
+    const rx = mx + (cam.scrollX + (GAME_WIDTH - GAME_WIDTH / cam.zoom) / 2 - WORLD_CENTER_X) * scale;
+    const ry = my + (cam.scrollY + (MAP_VIEWPORT_HEIGHT - MAP_VIEWPORT_HEIGHT / cam.zoom) / 2 - WORLD_CENTER_Y) * scale;
     g.lineStyle(1.2, 0xffffff, 0.95);
     g.strokeRect(rx, ry, rw, rh);
   }

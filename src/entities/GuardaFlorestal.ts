@@ -3,8 +3,10 @@ import { FireSmokeSystem } from '../systems/FireSmokeSystem';
 import {
   CAMPO_RADIUS,
   FLORESTA_OUTER_RADIUS,
+  ISO_Y_RATIO,
   WORLD_CENTER_X,
-  WORLD_CENTER_Y
+  WORLD_CENTER_Y,
+  getIsoDistance
 } from '../config/GameBalance';
 import { UnitType } from '../types/GameTypes';
 import { BossFortress } from './BossFortress';
@@ -22,7 +24,7 @@ export class GuardaFlorestal extends Unit {
   constructor(scene: Phaser.Scene, id: string, x: number, y: number) {
     super(scene, id, UnitType.GUARDA_FLORESTAL, 'unit_guarda', x, y);
     this.baseSpeed = 152;
-    this.visionCircle = scene.add.graphics().setDepth(20);
+    this.visionCircle = scene.add.graphics().setDepth(17);
   }
 
   public isImmuneToSmoke(): boolean {
@@ -44,7 +46,7 @@ export class GuardaFlorestal extends Unit {
 
     for (const enemy of arsonists) {
       if (!enemy.isAlive()) continue;
-      const d = Phaser.Math.Distance.Between(this.x, this.y, enemy.x, enemy.y);
+      const d = getIsoDistance(this.x, this.y, enemy.x, enemy.y);
       if (d < nearestEnemyDist) {
         nearestEnemyDist = d;
         nearestEnemy = enemy;
@@ -61,14 +63,14 @@ export class GuardaFlorestal extends Unit {
       const fires = fireSystem.getActiveFires();
       if (fires.length > 0) {
         let closestFire = fires[0];
-        let minFireDist = Phaser.Math.Distance.Between(
+        let minFireDist = getIsoDistance(
           this.x,
           this.y,
           closestFire.data.x,
           closestFire.data.y
         );
         for (const f of fires) {
-          const fd = Phaser.Math.Distance.Between(this.x, this.y, f.data.x, f.data.y);
+          const fd = getIsoDistance(this.x, this.y, f.data.x, f.data.y);
           if (fd < minFireDist) {
             minFireDist = fd;
             closestFire = f;
@@ -80,7 +82,7 @@ export class GuardaFlorestal extends Unit {
         const r = (CAMPO_RADIUS + FLORESTA_OUTER_RADIUS) / 2;
         this.setCommandTarget(
           WORLD_CENTER_X + Math.cos(this.patrolAngle) * r,
-          WORLD_CENTER_Y + Math.sin(this.patrolAngle) * r
+          WORLD_CENTER_Y + Math.sin(this.patrolAngle) * (r * ISO_Y_RATIO)
         );
       }
     }
@@ -88,13 +90,13 @@ export class GuardaFlorestal extends Unit {
     this.moveStep(deltaMs, 0);
 
     // Emboscada instantânea contra Incendiário ao alcançar alcance de captura
-    if (nearestEnemy && nearestEnemyDist <= 44) {
+    if (nearestEnemy && nearestEnemyDist <= 48) {
       onArsonistCaptured(nearestEnemy);
     }
 
     // Ajuda a conter fogo próximo
     for (const f of fireSystem.getActiveFires()) {
-      if (Phaser.Math.Distance.Between(this.x, this.y, f.data.x, f.data.y) <= 38) {
+      if (getIsoDistance(this.x, this.y, f.data.x, f.data.y) <= 42) {
         fireSystem.extinguishFire(f.data.id, 18 * dtSec);
         break;
       }
@@ -102,15 +104,15 @@ export class GuardaFlorestal extends Unit {
 
     // Fase 6: Cerco armado contra a Fortaleza do Burguês
     if (boss && boss.isActive()) {
-      const distBoss = Phaser.Math.Distance.Between(this.x, this.y, boss.x, boss.y);
-      if (distBoss <= 68) {
+      const distBoss = getIsoDistance(this.x, this.y, boss.x, boss.y);
+      if (distBoss <= 72) {
         boss.takeDamage(22 * dtSec);
       }
     }
 
     this.visionCircle.clear();
-    this.visionCircle.lineStyle(1, 0x10b981, 0.32);
-    this.visionCircle.strokeCircle(this.x, this.y, 56);
+    this.visionCircle.lineStyle(1.5, 0x10b981, 0.35);
+    this.visionCircle.strokeEllipse(this.x, this.y, 112, 56, 32);
     this.drawOverlays();
   }
 

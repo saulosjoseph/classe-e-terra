@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import {
   BALANCE,
   CAMPO_RADIUS,
+  CAMPO_RADIUS_Y,
   WORLD_CENTER_X,
   WORLD_CENTER_Y,
   getRandomPointInSector
@@ -215,7 +216,7 @@ export class SectorSystem extends Phaser.Events.EventEmitter {
         this.fireSystem.addFirebreakRing(CAMPO_RADIUS, 16000);
         this.spawnFloatingText(
           WORLD_CENTER_X,
-          WORLD_CENTER_Y + CAMPO_RADIUS - 30,
+          WORLD_CENTER_Y + CAMPO_RADIUS_Y - 15,
           '🛡️ Anel de Aceiro Construído!',
           '#facc15'
         );

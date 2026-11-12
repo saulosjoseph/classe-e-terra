@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import {
-  FLORESTA_OUTER_RADIUS,
+  FLORESTA_OUTER_RADIUS_Y,
   WORLD_CENTER_X,
   WORLD_CENTER_Y
 } from '../config/GameBalance';
@@ -18,6 +18,7 @@ export class BossFortress extends Phaser.Events.EventEmitter {
   private active = false;
   private defeated = false;
   private sprite: Phaser.GameObjects.Sprite;
+  private shadowGraphics: Phaser.GameObjects.Graphics;
   private hpGraphics: Phaser.GameObjects.Graphics;
   private titleText: Phaser.GameObjects.Text;
   private hitZone: Phaser.GameObjects.Zone;
@@ -28,19 +29,25 @@ export class BossFortress extends Phaser.Events.EventEmitter {
     this.scene = scene;
     this.maxHp = maxHp;
     this.hp = maxHp;
-    // Posicionado ao Sul no anel externo da Floresta
+    // Posicionado ao Sul no anel externo da Floresta em perspectiva isométrica
     this.x = WORLD_CENTER_X;
-    this.y = WORLD_CENTER_Y + FLORESTA_OUTER_RADIUS - 90;
+    this.y = WORLD_CENTER_Y + FLORESTA_OUTER_RADIUS_Y - 45;
+
+    // Sombra elíptica no solo isométrico
+    this.shadowGraphics = scene.add.graphics().setDepth(18).setVisible(false);
+    this.shadowGraphics.fillStyle(0x090d0a, 0.65);
+    this.shadowGraphics.fillEllipse(this.x, this.y + 4, 88, 44, 32);
 
     this.sprite = scene.add
       .sprite(this.x, this.y, 'boss_fortress')
-      .setDepth(26)
+      .setOrigin(0.5, 0.88)
+      .setDepth(20 + Math.floor(this.y))
       .setScale(1.25)
       .setVisible(false);
 
-    this.hpGraphics = scene.add.graphics().setDepth(32).setVisible(false);
+    this.hpGraphics = scene.add.graphics().setDepth(25 + Math.floor(this.y)).setVisible(false);
     this.titleText = scene.add
-      .text(this.x, this.y - 40, '🎩 O BURGUÊS', {
+      .text(this.x, this.y - 56, '🎩 O BURGUÊS', {
         fontFamily: 'Courier New, monospace',
         fontSize: '12px',
         fontStyle: 'bold',
@@ -49,11 +56,11 @@ export class BossFortress extends Phaser.Events.EventEmitter {
         padding: { x: 4, y: 2 }
       })
       .setOrigin(0.5)
-      .setDepth(33)
+      .setDepth(26 + Math.floor(this.y))
       .setVisible(false);
 
     this.hitZone = scene.add
-      .zone(this.x, this.y, 76, 76)
+      .zone(this.x, this.y, 82, 82)
       .setInteractive({ useHandCursor: true })
       .setDepth(39);
 
@@ -67,6 +74,7 @@ export class BossFortress extends Phaser.Events.EventEmitter {
   public reveal(): void {
     if (this.active) return;
     this.active = true;
+    this.shadowGraphics.setVisible(true);
     this.sprite.setVisible(true);
     this.hpGraphics.setVisible(true);
     this.titleText.setVisible(true);
@@ -74,7 +82,7 @@ export class BossFortress extends Phaser.Events.EventEmitter {
 
     this.scene.tweens.add({
       targets: this.sprite,
-      scale: { from: 0.3, to: 1.2 },
+      scale: { from: 0.3, to: 1.25 },
       duration: 550,
       ease: 'Back.easeOut'
     });

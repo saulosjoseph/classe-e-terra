@@ -2,10 +2,14 @@ import Phaser from 'phaser';
 import {
   CAMPO_RADIUS,
   FLORESTA_OUTER_RADIUS,
+  ISO_INVERSE_Y_RATIO,
+  ISO_Y_RATIO,
   WORLD_CENTER_X,
   WORLD_CENTER_Y,
   WORLD_HEIGHT,
-  WORLD_WIDTH
+  WORLD_WIDTH,
+  getIsoDistance,
+  getIsoSquareDist
 } from '../config/GameBalance';
 import { UnitType } from '../types/GameTypes';
 
@@ -17,6 +21,7 @@ export abstract class Unit extends Phaser.Events.EventEmitter {
   public targetX: number;
   public targetY: number;
   public sprite: Phaser.GameObjects.Sprite;
+  public shadowSprite: Phaser.GameObjects.Sprite;
   public selectionRing: Phaser.GameObjects.Graphics;
   public statusBar: Phaser.GameObjects.Graphics;
   protected scene: Phaser.Scene;
@@ -42,11 +47,22 @@ export abstract class Unit extends Phaser.Events.EventEmitter {
     this.y = y;
     this.targetX = x;
     this.targetY = y;
-    this.patrolAngle = Math.atan2(y - WORLD_CENTER_Y, x - WORLD_CENTER_X);
+    this.patrolAngle = Math.atan2((y - WORLD_CENTER_Y) * ISO_INVERSE_Y_RATIO, x - WORLD_CENTER_X);
 
-    this.selectionRing = scene.add.graphics().setDepth(24);
-    this.sprite = scene.add.sprite(x, y, textureKey).setDepth(25);
-    this.statusBar = scene.add.graphics().setDepth(26);
+    // Sombra elíptica projetada no plano do chão isométrico
+    this.shadowSprite = scene.add.sprite(x, y, 'unit_shadow').setOrigin(0.5, 0.5).setDepth(18);
+
+    // Anel de seleção em elipse isométrica 2:1
+    this.selectionRing = scene.add.graphics().setDepth(19);
+
+    // Sprite com pivô nos pés (0.5, 0.88) e profundidade vinculada ao Y do chão
+    this.sprite = scene.add
+      .sprite(x, y, textureKey)
+      .setOrigin(0.5, 0.88)
+      .setDepth(20 + Math.floor(y));
+
+    // Barra de energia flutuando acima da cabeça
+    this.statusBar = scene.add.graphics().setDepth(21 + Math.floor(y));
 
     this.drawOverlays();
   }
@@ -55,18 +71,17 @@ export abstract class Unit extends Phaser.Events.EventEmitter {
     let clampedX = Phaser.Math.Clamp(tx, 48, WORLD_WIDTH - 48);
     let clampedY = Phaser.Math.Clamp(ty, 48, WORLD_HEIGHT - 48);
 
-    const dx = clampedX - WORLD_CENTER_X;
-    const dy = clampedY - WORLD_CENTER_Y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    const angle = Math.atan2(dy, dx);
+    const sqDist = getIsoSquareDist(clampedX, clampedY);
 
-    // Regra do GDD: Brigada Voluntária inicial é restrita ao anel da Floresta!
-    if (this.unitType === UnitType.BRIGADA_VOLUNTARIA && dist < CAMPO_RADIUS + 18) {
-      clampedX = WORLD_CENTER_X + Math.cos(angle) * (CAMPO_RADIUS + 26);
-      clampedY = WORLD_CENTER_Y + Math.sin(angle) * (CAMPO_RADIUS + 26);
-    } else if (dist > FLORESTA_OUTER_RADIUS - 20) {
-      clampedX = WORLD_CENTER_X + Math.cos(angle) * (FLORESTA_OUTER_RADIUS - 24);
-      clampedY = WORLD_CENTER_Y + Math.sin(angle) * (FLORESTA_OUTER_RADIUS - 24);
+    // Regra do GDD: Brigada Voluntária inicial é restrita ao setor quadrado da Floresta!
+    if (this.unitType === UnitType.BRIGADA_VOLUNTARIA && sqDist < CAMPO_RADIUS + 20) {
+      const factor = (CAMPO_RADIUS + 28) / Math.max(1, sqDist);
+      clampedX = Math.round(WORLD_CENTER_X + (clampedX - WORLD_CENTER_X) * factor);
+      clampedY = Math.round(WORLD_CENTER_Y + (clampedY - WORLD_CENTER_Y) * factor);
+    } else if (sqDist > FLORESTA_OUTER_RADIUS - 24) {
+      const factor = (FLORESTA_OUTER_RADIUS - 30) / Math.max(1, sqDist);
+      clampedX = Math.round(WORLD_CENTER_X + (clampedX - WORLD_CENTER_X) * factor);
+      clampedY = Math.round(WORLD_CENTER_Y + (clampedY - WORLD_CENTER_Y) * factor);
     }
 
     this.targetX = clampedX;
@@ -83,13 +98,13 @@ export abstract class Unit extends Phaser.Events.EventEmitter {
   }
 
   public isMoving(): boolean {
-    return Phaser.Math.Distance.Between(this.x, this.y, this.targetX, this.targetY) > 6;
+    return getIsoDistance(this.x, this.y, this.targetX, this.targetY) > 6;
   }
 
   public abstract isImmuneToSmoke(): boolean;
 
   protected moveStep(deltaMs: number, smokeLevelAtPos: number): void {
-    const dist = Phaser.Math.Distance.Between(this.x, this.y, this.targetX, this.targetY);
+    const dist = getIsoDistance(this.x, this.y, this.targetX, this.targetY);
     if (dist <= 4) return;
 
     const dtSec = deltaMs / 1000;
@@ -107,33 +122,46 @@ export abstract class Unit extends Phaser.Events.EventEmitter {
       speed *= 0.58;
     }
 
-    const angle = Phaser.Math.Angle.Between(this.x, this.y, this.targetX, this.targetY);
+    // Ângulo e passo no plano do solo isométrico
+    const groundAngle = Math.atan2(
+      (this.targetY - this.y) * ISO_INVERSE_Y_RATIO,
+      this.targetX - this.x
+    );
     const step = Math.min(dist, speed * dtSec);
-    this.x += Math.cos(angle) * step;
-    this.y += Math.sin(angle) * step;
+    this.x += Math.cos(groundAngle) * step;
+    this.y += Math.sin(groundAngle) * step * ISO_Y_RATIO;
 
-    this.sprite.setPosition(this.x, this.y);
+    // Flip horizontal em 3/4 conforme direção
+    if (Math.abs(this.targetX - this.x) > 2) {
+      this.sprite.setFlipX(this.targetX < this.x);
+    }
+
+    const yDepth = 20 + Math.floor(this.y);
+    this.sprite.setPosition(this.x, this.y).setDepth(yDepth);
+    this.shadowSprite.setPosition(this.x, this.y);
+    this.statusBar.setDepth(yDepth + 1);
   }
 
   protected drawOverlays(): void {
     this.selectionRing.clear();
     if (this.hasEquipmentBoost()) {
       this.selectionRing.lineStyle(2, 0xfacc15, 0.9);
-      this.selectionRing.strokeCircle(this.x, this.y + 2, 16);
+      this.selectionRing.strokeEllipse(this.x, this.y, 30, 15, 24);
     } else {
       this.selectionRing.lineStyle(
         1.5,
         this.unitType === UnitType.GUARDA_FLORESTAL ? 0x10b981 : 0x38bdf8,
         0.55
       );
-      this.selectionRing.strokeCircle(this.x, this.y + 2, 14);
+      this.selectionRing.strokeEllipse(this.x, this.y, 26, 13, 24);
     }
 
     this.statusBar.clear();
     const w = 24;
     const h = 3;
+    const barY = this.y - 28;
     this.statusBar.fillStyle(0x090d0a, 0.85);
-    this.statusBar.fillRect(this.x - w / 2, this.y - 18, w, h);
+    this.statusBar.fillRect(this.x - w / 2, barY, w, h);
     const ratio = Phaser.Math.Clamp(this.stamina / this.maxStamina, 0, 1);
     const color =
       this.unitType === UnitType.GUARDA_FLORESTAL
@@ -142,11 +170,12 @@ export abstract class Unit extends Phaser.Events.EventEmitter {
           ? 0x38bdf8
           : 0xf59e0b;
     this.statusBar.fillStyle(color, 1);
-    this.statusBar.fillRect(this.x - w / 2, this.y - 18, w * ratio, h);
+    this.statusBar.fillRect(this.x - w / 2, barY, w * ratio, h);
   }
 
   public destroy(): void {
     this.sprite.destroy();
+    this.shadowSprite.destroy();
     this.selectionRing.destroy();
     this.statusBar.destroy();
   }

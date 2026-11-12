@@ -2,10 +2,15 @@ import Phaser from 'phaser';
 import {
   BALANCE,
   CAMPO_RADIUS,
+  CAMPO_RADIUS_Y,
   CITY_RADIUS,
+  CITY_RADIUS_Y,
   DIFFICULTY_CONFIGS,
   FLORESTA_OUTER_RADIUS,
+  FLORESTA_OUTER_RADIUS_Y,
   GAME_WIDTH,
+  ISO_INVERSE_Y_RATIO,
+  ISO_Y_RATIO,
   MAP_BOTTOM_Y,
   MAP_TOP_Y,
   MAP_VIEWPORT_HEIGHT,
@@ -14,6 +19,7 @@ import {
   WORLD_CENTER_Y,
   WORLD_HEIGHT,
   WORLD_WIDTH,
+  getIsoDistance,
   getRandomPointInSector,
   getSectorAtPoint
 } from '../config/GameBalance';
@@ -70,6 +76,20 @@ export class GameScene extends Phaser.Scene {
     D: Phaser.Input.Keyboard.Key;
   };
 
+  // Controle de Zoom (Mouse Wheel e Movimento de Pinça no Touch)
+  private cameraZoom = 1.0;
+  private readonly minCameraZoom = 0.25;
+  private readonly maxCameraZoom = 2.0;
+  private isPinchingCamera = false;
+  private initialPinchDistance = 0;
+  private initialPinchZoom = 1.0;
+
+  // Configurações do Grid Isométrico para a Cidade (casas populares brasileiras)
+  private mapGridWidth = 6;
+  private mapGridHeight = 6;
+  private tileWidth = 64;
+  private tileHeight = 32;
+
   // Estatísticas da partida
   private firesExtinguished = 0;
   private arsonistsCaptured = 0;
@@ -95,6 +115,10 @@ export class GameScene extends Phaser.Scene {
     this.integratedActionsUsed = 0;
     this.isEnding = false;
     this.isDraggingCamera = false;
+    this.cameraZoom = 1.0;
+    this.isPinchingCamera = false;
+    this.initialPinchDistance = 0;
+    this.initialPinchZoom = 1.0;
   }
 
   public create(): void {
@@ -121,7 +145,7 @@ export class GameScene extends Phaser.Scene {
     // 1 Brigada Voluntária restrita ao anel da Floresta (posicionada ao sul da Cidade, na borda interna da Floresta)
     this.spawnBrigadistaUnit(
       WORLD_CENTER_X,
-      WORLD_CENTER_Y + CAMPO_RADIUS + 55,
+      WORLD_CENTER_Y + CAMPO_RADIUS_Y + 28,
       false,
       false
     );
@@ -129,7 +153,7 @@ export class GameScene extends Phaser.Scene {
     // Cria 1 foco inicial na Floresta ao Sul para o jogador explorar o mapa
     this.fireSystem.spawnFire(
       WORLD_CENTER_X + 60,
-      WORLD_CENTER_Y + CAMPO_RADIUS + 110,
+      WORLD_CENTER_Y + CAMPO_RADIUS_Y + 55,
       22
     );
 
@@ -144,13 +168,17 @@ export class GameScene extends Phaser.Scene {
 
   /**
    * Configura a câmera principal para ocupar o viewport entre o HUD superior e o HUD inferior,
-   * permitindo navegar pelos 1600x1600 do mapa concêntrico e começando centralizada na Cidade.
+   * com suporte a navegação por arraste, roda do mouse (zoom) e movimento de pinça no celular.
    */
   private setupScrollableCamera(): void {
     const cam = this.cameras.main;
     cam.setViewport(0, MAP_TOP_Y, GAME_WIDTH, MAP_VIEWPORT_HEIGHT);
     cam.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
     cam.centerOn(WORLD_CENTER_X, WORLD_CENTER_Y);
+    cam.setZoom(this.cameraZoom);
+
+    // Habilita ponteiro adicional para suporte a gestos multitoque (pinça / pinch-to-zoom)
+    this.input.addPointer(1);
 
     if (this.input.keyboard) {
       this.cursors = this.input.keyboard.createCursorKeys();
@@ -160,12 +188,41 @@ export class GameScene extends Phaser.Scene {
         S: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S),
         D: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D)
       };
+
+      // Atalhos de teclado para zoom (+ / - / =)
+      this.input.keyboard.on('keydown-PLUS', () => this.zoomIn());
+      this.input.keyboard.on('keydown-EQUALS', () => this.zoomIn());
+      this.input.keyboard.on('keydown-MINUS', () => this.zoomOut());
     }
 
-    // Arraste (Touch Pan / Mouse Drag) para mover a câmera para os lados, cima e baixo
+    // 1. Zoom via Roda de Rolagem do Mouse (Mouse Wheel)
+    this.input.on(
+      'wheel',
+      (pointer: Phaser.Input.Pointer, _over: unknown[], _dx: number, deltaY: number) => {
+        if (pointer.y < MAP_TOP_Y || pointer.y > MAP_BOTTOM_Y) return;
+        SoundManager.unlock();
+        const factor = deltaY > 0 ? 0.88 : 1.14;
+        this.setCameraZoom(this.cameraZoom * factor, false);
+      }
+    );
+
+    // 2. Toque inicial e detecção de Pinça (Pinch) ou Arraste (Pan)
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
       if (pointer.y < MAP_TOP_Y || pointer.y > MAP_BOTTOM_Y) return;
       SoundManager.unlock();
+
+      const p1 = this.input.pointer1;
+      const p2 = this.input.pointer2;
+
+      // Se dois dedos estiverem na tela, inicia o movimento de pinça no celular
+      if (p1.isDown && p2.isDown) {
+        this.isPinchingCamera = true;
+        this.isDraggingCamera = false;
+        this.initialPinchDistance = Math.hypot(p1.x - p2.x, p1.y - p2.y);
+        this.initialPinchZoom = this.cameras.main.zoom;
+        return;
+      }
+
       this.isDraggingCamera = true;
       this.dragStartPointerX = pointer.x;
       this.dragStartPointerY = pointer.y;
@@ -173,11 +230,29 @@ export class GameScene extends Phaser.Scene {
       this.dragStartScrollY = cam.scrollY;
     });
 
+    // 3. Movimento: Atualiza Zoom por Pinça ou Arraste de Câmera
     this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
-      if (!this.isDraggingCamera || !pointer.isDown) return;
-      const dx = pointer.x - this.dragStartPointerX;
-      const dy = pointer.y - this.dragStartPointerY;
-      if (Math.hypot(dx, dy) > 4) {
+      const p1 = this.input.pointer1;
+      const p2 = this.input.pointer2;
+
+      // Movimento de pinça com 2 dedos no celular
+      if (p1.isDown && p2.isDown) {
+        this.isDraggingCamera = false;
+        const currentDist = Math.hypot(p1.x - p2.x, p1.y - p2.y);
+        if (this.initialPinchDistance > 12) {
+          const pinchFactor = currentDist / this.initialPinchDistance;
+          this.setCameraZoom(this.initialPinchZoom * pinchFactor, false);
+        }
+        return;
+      }
+
+      if (!this.isDraggingCamera || !pointer.isDown || this.isPinchingCamera) return;
+
+      // Ajusta o arraste pelo fator de zoom da câmera para movimentação fluida 1:1
+      const dx = (pointer.x - this.dragStartPointerX) / cam.zoom;
+      const dy = (pointer.y - this.dragStartPointerY) / cam.zoom;
+
+      if (Math.hypot(dx, dy) > 3) {
         cam.scrollX = Phaser.Math.Clamp(
           this.dragStartScrollX - dx,
           0,
@@ -192,8 +267,49 @@ export class GameScene extends Phaser.Scene {
     });
 
     this.input.on('pointerup', () => {
-      this.isDraggingCamera = false;
+      const p1 = this.input.pointer1;
+      const p2 = this.input.pointer2;
+      if (!p1.isDown && !p2.isDown) {
+        this.isPinchingCamera = false;
+        this.isDraggingCamera = false;
+      } else if (!p1.isDown || !p2.isDown) {
+        this.isPinchingCamera = false;
+      }
     });
+  }
+
+  public setCameraZoom(newZoom: number, animate = false): void {
+    const target = Phaser.Math.Clamp(newZoom, this.minCameraZoom, this.maxCameraZoom);
+    this.cameraZoom = target;
+    const cam = this.cameras.main;
+
+    if (!animate) {
+      cam.setZoom(target);
+      return;
+    }
+
+    this.tweens.add({
+      targets: cam,
+      zoom: target,
+      duration: 220,
+      ease: 'Cubic.easeOut'
+    });
+  }
+
+  public zoomIn(): void {
+    SoundManager.unlock();
+    SoundManager.playSelect();
+    this.setCameraZoom(this.cameraZoom * 1.25, true);
+  }
+
+  public zoomOut(): void {
+    SoundManager.unlock();
+    SoundManager.playSelect();
+    this.setCameraZoom(this.cameraZoom * 0.8, true);
+  }
+
+  public getCameraZoom(): number {
+    return this.cameraZoom;
   }
 
   public centerCameraOnPoint(wx: number, wy: number, animate = true): void {
@@ -235,146 +351,296 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * Desenha o mapa concêntrico de 1600x1600:
-   * - Centro: CIDADE (Santarém)
-   * - Círculo Imediato: CAMPO & RIBEIRINHOS
-   * - Círculo Externo: FLORESTA (Baixo Tapajós)
-   * Conectados por estradas radiais e pelo Rio Tapajós.
+   * Desenha o mapa de Santarém e Baixo Tapajós em Visão Isométrica com Setores Quadrados:
+   * - Centro: CIDADE QUADRADA ISOMÉTRICA com malha viária de asfalto, calçadas, linhas brancas e muro perimetral
+   * - Anel Intermediário: CAMPO & RIBEIRINHOS QUADRADO ISOMÉTRICO
+   * - Anel Externo: FLORESTA QUADRADA ISOMÉTRICA
+   * Totalmente alinhado aos eixos isométricos (sem círculos concêntricos).
    */
   private drawConcentricSantaremMap(): void {
     const g = this.add.graphics().setDepth(1);
+    const cx = WORLD_CENTER_X;
+    const cy = WORLD_CENTER_Y;
 
     // Fundo de mata profunda nas bordas do mundo
     g.fillStyle(0x042f2e, 1);
     g.fillRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
 
-    // 3. Círculo Externo: FLORESTA (Raio até 760px)
-    g.fillStyle(0x064e3b, 1);
-    g.fillCircle(WORLD_CENTER_X, WORLD_CENTER_Y, FLORESTA_OUTER_RADIUS);
-    g.fillStyle(0x047857, 0.42);
-    g.fillCircle(WORLD_CENTER_X, WORLD_CENTER_Y, FLORESTA_OUTER_RADIUS - 30);
+    // Malha sutil de relevo / grid isométrico no solo
+    g.lineStyle(1, 0x064e3b, 0.28);
+    for (let offset = -3800; offset <= 3800; offset += 180) {
+      g.beginPath();
+      g.moveTo(cx + offset - 3000, cy - 1500 + (offset * 0.25));
+      g.lineTo(cx + offset + 3000, cy + 1500 + (offset * 0.25));
+      g.strokePath();
 
-    // 2. Círculo Imediato à Cidade: CAMPO & RIBEIRINHOS (Raio até 470px)
-    g.fillStyle(0x3f6212, 1);
-    g.fillCircle(WORLD_CENTER_X, WORLD_CENTER_Y, CAMPO_RADIUS);
-    g.fillStyle(0x4d7c0f, 0.48);
-    g.fillCircle(WORLD_CENTER_X, WORLD_CENTER_Y, CAMPO_RADIUS - 24);
-
-    // 1. Círculo Central: CIDADE DE SANTARÉM (Raio até 230px)
-    g.fillStyle(0x78350f, 1);
-    g.fillCircle(WORLD_CENTER_X, WORLD_CENTER_Y, CITY_RADIUS);
-    g.fillStyle(0x92400e, 0.58);
-    g.fillCircle(WORLD_CENTER_X, WORLD_CENTER_Y, CITY_RADIUS - 20);
-
-    // Rio Tapajós e igarapés cortando da Floresta -> Campo -> Cidade
-    g.fillStyle(0x0284c7, 0.85);
-    g.beginPath();
-    g.moveTo(WORLD_CENTER_X - 720, WORLD_CENTER_Y - 380);
-    g.lineTo(WORLD_CENTER_X - 70, WORLD_CENTER_Y - 95);
-    g.lineTo(WORLD_CENTER_X + 740, WORLD_CENTER_Y - 320);
-    g.lineTo(WORLD_CENTER_X + 740, WORLD_CENTER_Y - 260);
-    g.lineTo(WORLD_CENTER_X - 60, WORLD_CENTER_Y - 40);
-    g.lineTo(WORLD_CENTER_X - 720, WORLD_CENTER_Y - 320);
-    g.closePath();
-    g.fillPath();
-
-    // Afluente Sul (Rio Arapiuns / Igarapés da Floresta ao Campo)
-    g.beginPath();
-    g.moveTo(WORLD_CENTER_X - 95, WORLD_CENTER_Y - 60);
-    g.lineTo(WORLD_CENTER_X - 45, WORLD_CENTER_Y - 60);
-    g.lineTo(WORLD_CENTER_X - 180, WORLD_CENTER_Y + 720);
-    g.lineTo(WORLD_CENTER_X - 235, WORLD_CENTER_Y + 720);
-    g.closePath();
-    g.fillPath();
-
-    // Estradas e Trilhas Radiais conectando Cidade <-> Campo <-> Floresta (Norte, Sul, Leste, Oeste)
-    g.fillStyle(0xd97706, 0.52);
-    g.fillRect(
-      WORLD_CENTER_X - 14,
-      WORLD_CENTER_Y - FLORESTA_OUTER_RADIUS,
-      28,
-      FLORESTA_OUTER_RADIUS * 2
-    );
-    g.fillRect(
-      WORLD_CENTER_X - FLORESTA_OUTER_RADIUS,
-      WORLD_CENTER_Y - 14,
-      FLORESTA_OUTER_RADIUS * 2,
-      28
-    );
-
-    // Fronteiras circulares tracejadas/destacadas entre os setores
-    g.lineStyle(3, 0xfef08a, 0.45);
-    g.strokeCircle(WORLD_CENTER_X, WORLD_CENTER_Y, CITY_RADIUS);
-    g.lineStyle(3, 0x84cc16, 0.45);
-    g.strokeCircle(WORLD_CENTER_X, WORLD_CENTER_Y, CAMPO_RADIUS);
-    g.lineStyle(3, 0x22c55e, 0.38);
-    g.strokeCircle(WORLD_CENTER_X, WORLD_CENTER_Y, FLORESTA_OUTER_RADIUS);
-
-    // Placas indicadoras nos anéis (Norte, Sul, Leste, Oeste)
-    this.addSectorLabel(WORLD_CENTER_X, WORLD_CENTER_Y - 18, SECTOR_INFO[SectorType.CIDADE].label);
-    const directions = [
-      { dx: 0, dy: -1, dirName: 'NORTE' },
-      { dx: 0, dy: 1, dirName: 'SUL' },
-      { dx: -1, dy: 0, dirName: 'OESTE' },
-      { dx: 1, dy: 0, dirName: 'LESTE' }
-    ];
-
-    for (const d of directions) {
-      const campoR = (CITY_RADIUS + CAMPO_RADIUS) / 2;
-      this.addSectorLabel(
-        WORLD_CENTER_X + d.dx * campoR,
-        WORLD_CENTER_Y + d.dy * campoR,
-        `🌾 CAMPO (${d.dirName})`
-      );
-
-      const florestaR = (CAMPO_RADIUS + FLORESTA_OUTER_RADIUS) / 2;
-      this.addSectorLabel(
-        WORLD_CENTER_X + d.dx * florestaR,
-        WORLD_CENTER_Y + d.dy * florestaR,
-        `🌳 FLORESTA (${d.dirName})`
-      );
+      g.beginPath();
+      g.moveTo(cx + offset - 3000, cy + 1500 - (offset * 0.25));
+      g.lineTo(cx + offset + 3000, cy - 1500 - (offset * 0.25));
+      g.strokePath();
     }
 
-    // Props da CIDADE (Centro)
-    for (let i = 0; i < 14; i++) {
-      const angle = (i / 14) * Math.PI * 2;
-      const r = 65 + (i % 3) * 48;
-      const px = WORLD_CENTER_X + Math.cos(angle) * r;
-      const py = WORLD_CENTER_Y + Math.sin(angle) * r;
-      this.add.sprite(px, py, 'prop_city_house').setDepth(6).setAlpha(0.92);
+    const drawIsoSquare = (radX: number, radY: number, fillHex?: number, strokeHex?: number, strokeWidth = 3) => {
+      g.beginPath();
+      g.moveTo(cx, cy - radY);
+      g.lineTo(cx + radX, cy);
+      g.lineTo(cx, cy + radY);
+      g.lineTo(cx - radX, cy);
+      g.closePath();
+      if (fillHex !== undefined) {
+        g.fillStyle(fillHex, 1);
+        g.fillPath();
+      }
+      if (strokeHex !== undefined) {
+        g.lineStyle(strokeWidth, strokeHex, 0.7);
+        g.strokePath();
+      }
+    };
+
+    // 3. Setor Externo: FLORESTA QUADRADA ISOMÉTRICA (Losango 2:1)
+    drawIsoSquare(FLORESTA_OUTER_RADIUS, FLORESTA_OUTER_RADIUS_Y, 0x064e3b, 0x22c55e, 3);
+    drawIsoSquare(FLORESTA_OUTER_RADIUS - 40, FLORESTA_OUTER_RADIUS_Y - 20, 0x047857);
+
+    // 2. Setor Intermediário: CAMPO & RIBEIRINHOS QUADRADO ISOMÉTRICO (Losango 2:1)
+    drawIsoSquare(CAMPO_RADIUS, CAMPO_RADIUS_Y, 0x3f6212, 0x84cc16, 3);
+    drawIsoSquare(CAMPO_RADIUS - 30, CAMPO_RADIUS_Y - 15, 0x4d7c0f);
+
+    // 1. Núcleo Central: CIDADE QUADRADA ISOMÉTRICA QUADRUPLICADA (Losango 2:1, Raio X: 1840px, Raio Y: 920px)
+    // Piso de gramado verde vivo conforme imagem de referência
+    drawIsoSquare(CITY_RADIUS, CITY_RADIUS_Y, 0x3a6b22, 0x22c55e, 4);
+    drawIsoSquare(CITY_RADIUS - 14, CITY_RADIUS_Y - 7, 0x3a6b22);
+
+    // Traçado viário ortogonal isométrico da Cidade:
+    // Pistas de asfalto cinza escuro, linhas brancas tracejadas e quarteirões com gramado verde
+    const streetsGraphics = this.add.graphics().setDepth(2);
+    const markingsGraphics = this.add.graphics().setDepth(4);
+
+    // Grid ortogonal isométrico ajustado para enquadramento idêntico à imagem de referência
+    const streetStep = 200;
+    const streetWidth = 28;
+    const halfWidth = streetWidth / 2;
+    const gridBound = 900; // Limite da malha viária da cidade (u, v de -900 a +900)
+
+    // 1. Ruas na diagonal noroeste-sudeste (direção U: v = constante, dx = +1, dy = +0.5)
+    for (let k = -4; k <= 4; k++) {
+      const v = k * streetStep;
+      const v1 = v - halfWidth;
+      const v2 = v + halfWidth;
+
+      streetsGraphics.fillStyle(0x222222, 1);
+      streetsGraphics.beginPath();
+      streetsGraphics.moveTo(cx - gridBound - v1, cy + (-gridBound + v1) * 0.5);
+      streetsGraphics.lineTo(cx + gridBound - v1, cy + (gridBound + v1) * 0.5);
+      streetsGraphics.lineTo(cx + gridBound - v2, cy + (gridBound + v2) * 0.5);
+      streetsGraphics.lineTo(cx - gridBound - v2, cy + (-gridBound + v2) * 0.5);
+      streetsGraphics.closePath();
+      streetsGraphics.fillPath();
+
+      // Linhas brancas tracejadas no centro da via (apenas entre os cruzamentos)
+      markingsGraphics.lineStyle(2, 0xf8fafc, 0.92);
+      for (let m = -4; m < 4; m++) {
+        const uStart = m * streetStep + halfWidth + 6;
+        const uEnd = (m + 1) * streetStep - halfWidth - 6;
+
+        for (let du = uStart; du + 10 <= uEnd; du += 22) {
+          const x1 = cx + du - v;
+          const y1 = cy + (du + v) * 0.5;
+          const x2 = cx + (du + 12) - v;
+          const y2 = cy + (du + 12 + v) * 0.5;
+          markingsGraphics.lineBetween(x1, y1, x2, y2);
+        }
+      }
     }
 
-    // Props do CAMPO (Anel intermediário)
+    // 2. Ruas na diagonal sudoeste-nordeste (direção V: u = constante, dx = -1, dy = +0.5)
+    for (let m = -4; m <= 4; m++) {
+      const u = m * streetStep;
+      const u1 = u - halfWidth;
+      const u2 = u + halfWidth;
+
+      streetsGraphics.fillStyle(0x222222, 1);
+      streetsGraphics.beginPath();
+      streetsGraphics.moveTo(cx + u1 - (-gridBound), cy + (u1 + (-gridBound)) * 0.5);
+      streetsGraphics.lineTo(cx + u2 - (-gridBound), cy + (u2 + (-gridBound)) * 0.5);
+      streetsGraphics.lineTo(cx + u2 - gridBound, cy + (u2 + gridBound) * 0.5);
+      streetsGraphics.lineTo(cx + u1 - gridBound, cy + (u1 + gridBound) * 0.5);
+      streetsGraphics.closePath();
+      streetsGraphics.fillPath();
+
+      // Linhas brancas tracejadas no centro da via (apenas entre os cruzamentos)
+      markingsGraphics.lineStyle(2, 0xf8fafc, 0.92);
+      for (let k = -4; k < 4; k++) {
+        const vStart = k * streetStep + halfWidth + 6;
+        const vEnd = (k + 1) * streetStep - halfWidth - 6;
+
+        for (let dv = vStart; dv + 10 <= vEnd; dv += 22) {
+          const x1 = cx + u - dv;
+          const y1 = cy + (u + dv) * 0.5;
+          const x2 = cx + u - (dv + 12);
+          const y2 = cy + (u + dv + 12) * 0.5;
+          markingsGraphics.lineBetween(x1, y1, x2, y2);
+        }
+      }
+    }
+
+    // 3. Casas populares de Santarém alinhadas nos quarteirões gramados (conforme imagem de referência)
+    // Cada quarteirão possui fileiras organizadas de casas voltadas para a rua
+    for (let i = -4; i < 4; i++) {
+      for (let j = -4; j < 4; j++) {
+        const uc = (i + 0.5) * streetStep;
+        const vc = (j + 0.5) * streetStep;
+        const hx = cx + uc - vc;
+        const hy = cy + (uc + vc) * 0.5;
+
+        // Quadra central: apenas o Palácio Municipal (Prefeitura)
+        if (i === 0 && j === 0) {
+          const prefeitura = this.add.sprite(hx, hy - 4, 'prefeitura');
+          prefeitura.setOrigin(0.5, 0.652);
+          prefeitura.setScale(330 / 2477);
+          prefeitura.setDepth(hy + 10);
+          continue;
+        }
+
+        // Determina a quantidade de casas nas fileiras frontal e traseira da quadra
+        let frontCount = 4;
+        let backCount = 2;
+
+        if (i === -1 && j === 0) {
+          frontCount = 4;
+          backCount = 4; // Bloco centro-esquerdo: 2 fileiras cheias de 4 casas
+        } else if (i === -1 && j === -1) {
+          frontCount = 4;
+          backCount = 0; // Bloco superior esquerdo: 1 fileira de 4 casas
+        } else if (i === 0 && j === -1) {
+          frontCount = 4;
+          backCount = 2; // Bloco superior central
+        } else if (i === 1 && j === 0) {
+          frontCount = 2;
+          backCount = 2; // Bloco centro-direito
+        } else if (i === 1 && j === -1) {
+          frontCount = 2;
+          backCount = 2; // Bloco superior direito
+        } else if (i === -1 && j === 1) {
+          frontCount = 3;
+          backCount = 1; // Bloco inferior esquerdo
+        } else if (i === 0 && j === 1) {
+          frontCount = 4;
+          backCount = 2; // Bloco inferior central
+        } else if (i === 1 && j === 1) {
+          frontCount = 2;
+          backCount = 1; // Bloco inferior direito
+        } else if (i === -2 && j === 0) {
+          frontCount = 4;
+          backCount = 2;
+        } else if (i === -2 && j === -1) {
+          frontCount = 2;
+          backCount = 0;
+        } else if (i === 2 && j === 0) {
+          frontCount = 2;
+          backCount = 0;
+        } else if (i === 2 && j === -1) {
+          frontCount = 2;
+          backCount = 2;
+        } else if (i === -2 && j === 1) {
+          frontCount = 2;
+          backCount = 1;
+        } else {
+          // Padrão determinístico variado para as demais quadras do loteamento
+          const seed = Math.abs((i * 11 + j * 17 + 5) % 5);
+          if (seed === 0) { frontCount = 4; backCount = 2; }
+          else if (seed === 1) { frontCount = 3; backCount = 1; }
+          else if (seed === 2) { frontCount = 2; backCount = 2; }
+          else if (seed === 3) { frontCount = 2; backCount = 0; }
+          else { frontCount = 3; backCount = 0; }
+        }
+
+        const getRowOffsets = (count: number): number[] => {
+          if (count === 4) return [-51, -17, 17, 51];
+          if (count === 3) return [-34, 0, 34];
+          if (count === 2) return [-20, 20];
+          if (count === 1) return [0];
+          return [];
+        };
+
+        // Fileira frontal (voltada para a rua de baixo-esquerda)
+        const frontOffsets = getRowOffsets(frontCount);
+        const frontV = vc + 16;
+        for (const offU of frontOffsets) {
+          const u = uc + offU;
+          const hx = cx + u - frontV;
+          const hy = cy + (u + frontV) * 0.5;
+
+          const casa = this.add.sprite(hx, hy, 'casa_isometrica');
+          casa.setScale(0.60);
+          casa.setOrigin(0.5, 0.88);
+          casa.setDepth(hy);
+        }
+
+        // Fileira traseira (recuada no quarteirão com espaçamento nítido para o gramado)
+        const backOffsets = getRowOffsets(backCount);
+        const backV = vc - 44;
+        for (const offU of backOffsets) {
+          const u = uc + offU;
+          const hx = cx + u - backV;
+          const hy = cy + (u + backV) * 0.5;
+
+          const casa = this.add.sprite(hx, hy, 'casa_isometrica');
+          casa.setScale(0.60);
+          casa.setOrigin(0.5, 0.88);
+          casa.setDepth(hy);
+        }
+      }
+    }
+
+    // Props do CAMPO QUADRADO ISOMÉTRICO (Palafitas e roçados ribeirinhos)
     for (let i = 0; i < 24; i++) {
-      const angle = (i / 24) * Math.PI * 2 + 0.12;
-      const r = CITY_RADIUS + 50 + (i % 3) * 65;
-      const px = WORLD_CENTER_X + Math.cos(angle) * r;
-      const py = WORLD_CENTER_Y + Math.sin(angle) * r;
-      this.add.sprite(px, py, 'prop_farm').setDepth(6).setAlpha(0.92);
+      const pt = getRandomPointInSector(SectorType.CAMPO, 36);
+      this.add
+        .sprite(pt.x, pt.y, 'prop_farm')
+        .setOrigin(0.5, 0.9)
+        .setDepth(15 + Math.floor(pt.y))
+        .setAlpha(0.96);
     }
 
-    // Props da FLORESTA (Anel externo)
+    // Props da FLORESTA QUADRADA ISOMÉTRICA (Samaúmas e Castanheiras)
     for (let i = 0; i < 48; i++) {
-      const angle = (i / 48) * Math.PI * 2 + 0.05;
-      const r = CAMPO_RADIUS + 45 + (i % 4) * 62;
-      const px = WORLD_CENTER_X + Math.cos(angle) * r;
-      const py = WORLD_CENTER_Y + Math.sin(angle) * r;
-      this.add.sprite(px, py, 'prop_tree').setDepth(6).setAlpha(0.94);
+      const pt = getRandomPointInSector(SectorType.FLORESTA, 40);
+      this.add
+        .sprite(pt.x, pt.y, 'prop_tree')
+        .setOrigin(0.5, 0.92)
+        .setDepth(15 + Math.floor(pt.y))
+        .setAlpha(0.98);
     }
   }
 
-  private addSectorLabel(x: number, y: number, text: string): void {
-    this.add
-      .text(x, y, text, {
-        fontFamily: 'Courier New, monospace',
-        fontSize: '11px',
-        fontStyle: 'bold',
-        color: '#fef9c3',
-        backgroundColor: '#090d0acc',
-        padding: { x: 5, y: 2 }
-      })
-      .setOrigin(0.5)
-      .setDepth(10);
+  // Converte coordenadas do grid lógico para coordenadas de tela isométrica
+  private cartesianToIsometric(cartX: number, cartY: number, originX: number, originY: number) {
+    const screenX = originX + (cartX - cartY) * (this.tileWidth / 2);
+    const screenY = originY + (cartX + cartY) * (this.tileHeight / 2);
+    return { x: screenX, y: screenY };
+  }
+
+  // Desenha o piso isométrico para referência do cenário
+  private drawIsometricGrid(originX: number, originY: number) {
+    const graphics = this.add.graphics().setDepth(2);
+    graphics.lineStyle(1, 0x92400e, 0.4);
+
+    for (let x = 0; x < this.mapGridWidth; x++) {
+      for (let y = 0; y < this.mapGridHeight; y++) {
+        const p1 = this.cartesianToIsometric(x, y, originX, originY);
+        const p2 = this.cartesianToIsometric(x + 1, y, originX, originY);
+        const p3 = this.cartesianToIsometric(x + 1, y + 1, originX, originY);
+        const p4 = this.cartesianToIsometric(x, y + 1, originX, originY);
+
+        graphics.beginPath();
+        graphics.moveTo(p1.x, p1.y);
+        graphics.lineTo(p2.x, p2.y);
+        graphics.lineTo(p3.x, p3.y);
+        graphics.lineTo(p4.x, p4.y);
+        graphics.closePath();
+        graphics.strokePath();
+      }
+    }
   }
 
   private registerEvents(): void {
@@ -416,10 +682,10 @@ export class GameScene extends Phaser.Scene {
       phase.id >= PoliticalPhaseId.FASE_4_AUTODEFESA_ARMADA &&
       this.guardas.length === 0
     ) {
-      this.spawnGuardaUnit(WORLD_CENTER_X + 60, WORLD_CENTER_Y + CAMPO_RADIUS + 60, false);
+      this.spawnGuardaUnit(WORLD_CENTER_X + 60, WORLD_CENTER_Y + CAMPO_RADIUS_Y + 30, false);
     }
 
-    // Fase 5 (65%): Demarcação das Terras Indígenas (Barreira ecológica circular na Floresta)
+    // Fase 5 (65%): Demarcação das Terras Indígenas (Barreira ecológica elíptica na Floresta)
     if (phase.id >= PoliticalPhaseId.FASE_5_ESCUDO_TERRITORIAL) {
       this.drawIndigenousDemarcationShield();
     }
@@ -433,17 +699,20 @@ export class GameScene extends Phaser.Scene {
 
   private drawIndigenousDemarcationShield(): void {
     this.indigenousShieldGraphics.clear();
-    this.indigenousShieldGraphics.lineStyle(5, 0x10b981, 0.85);
-    this.indigenousShieldGraphics.strokeCircle(
-      WORLD_CENTER_X,
-      WORLD_CENTER_Y,
-      CAMPO_RADIUS + 8
-    );
-    this.indigenousShieldGraphics.strokeCircle(
-      WORLD_CENTER_X,
-      WORLD_CENTER_Y,
-      FLORESTA_OUTER_RADIUS - 8
-    );
+    this.indigenousShieldGraphics.lineStyle(5, 0x10b981, 0.9);
+
+    const drawShieldSquare = (rx: number, ry: number) => {
+      this.indigenousShieldGraphics.beginPath();
+      this.indigenousShieldGraphics.moveTo(WORLD_CENTER_X, WORLD_CENTER_Y - ry);
+      this.indigenousShieldGraphics.lineTo(WORLD_CENTER_X + rx, WORLD_CENTER_Y);
+      this.indigenousShieldGraphics.lineTo(WORLD_CENTER_X, WORLD_CENTER_Y + ry);
+      this.indigenousShieldGraphics.lineTo(WORLD_CENTER_X - rx, WORLD_CENTER_Y);
+      this.indigenousShieldGraphics.closePath();
+      this.indigenousShieldGraphics.strokePath();
+    };
+
+    drawShieldSquare(CAMPO_RADIUS + 18, CAMPO_RADIUS_Y + 9);
+    drawShieldSquare(FLORESTA_OUTER_RADIUS - 18, FLORESTA_OUTER_RADIUS_Y - 9);
   }
 
   public spawnBrigadistaUnit(
@@ -627,7 +896,7 @@ export class GameScene extends Phaser.Scene {
       for (const brig of this.brigadistas) {
         if (
           arsonist.isAlive() &&
-          Phaser.Math.Distance.Between(brig.x, brig.y, arsonist.x, arsonist.y) <= 28
+          getIsoDistance(brig.x, brig.y, arsonist.x, arsonist.y) <= 32
         ) {
           this.captureArsonist(arsonist);
           break;

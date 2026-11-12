@@ -2,8 +2,10 @@ import Phaser from 'phaser';
 import {
   CAMPO_RADIUS,
   FLORESTA_OUTER_RADIUS,
+  ISO_Y_RATIO,
   WORLD_CENTER_X,
-  WORLD_CENTER_Y
+  WORLD_CENTER_Y,
+  getIsoDistance
 } from '../config/GameBalance';
 import { ActiveFireInstance, FireSmokeSystem } from '../systems/FireSmokeSystem';
 import { SectorType, UnitType } from '../types/GameTypes';
@@ -88,7 +90,7 @@ export class Brigadista extends Unit {
     if (activeFires.length > 0) {
       // Escolhe o foco mais próximo (ou distribui entre brigadistas quando há múltiplos focos)
       for (const fire of activeFires) {
-        const d = Phaser.Math.Distance.Between(this.x, this.y, fire.data.x, fire.data.y);
+        const d = getIsoDistance(this.x, this.y, fire.data.x, fire.data.y);
         if (d < nearestDist) {
           nearestDist = d;
           targetFire = fire;
@@ -102,8 +104,8 @@ export class Brigadista extends Unit {
       // 2. Se não há incêndios ativos e o Burguês se revelou, marcha automaticamente para cercar a Fortaleza!
       const angleOffset = (this.unitIndex * 0.9) % (Math.PI * 2);
       this.setCommandTarget(
-        boss.x + Math.cos(angleOffset) * 32,
-        boss.y + Math.sin(angleOffset) * 32
+        boss.x + Math.cos(angleOffset) * 36,
+        boss.y + Math.sin(angleOffset) * (36 * ISO_Y_RATIO)
       );
     } else {
       // 3. Se não há fogo, verifica se há algum incendiário próximo para interceptar ou faz ronda preventiva
@@ -111,11 +113,11 @@ export class Brigadista extends Unit {
       let minArsonistDist = Infinity;
       for (const a of arsonists) {
         if (!a.isAlive()) continue;
-        const distCenter = Phaser.Math.Distance.Between(a.x, a.y, WORLD_CENTER_X, WORLD_CENTER_Y);
+        const distCenter = getIsoDistance(a.x, a.y, WORLD_CENTER_X, WORLD_CENTER_Y);
         if (this.unitType === UnitType.BRIGADA_VOLUNTARIA && distCenter < CAMPO_RADIUS) {
           continue;
         }
-        const d = Phaser.Math.Distance.Between(this.x, this.y, a.x, a.y);
+        const d = getIsoDistance(this.x, this.y, a.x, a.y);
         if (d < minArsonistDist) {
           minArsonistDist = d;
           closestArsonist = a;
@@ -125,7 +127,7 @@ export class Brigadista extends Unit {
       if (closestArsonist) {
         this.setCommandTarget(closestArsonist.x, closestArsonist.y);
       } else if (!this.isMoving()) {
-        // Ronda circular automática pelo setor
+        // Ronda circular automática pelo setor em elipse isométrica
         this.patrolAngle += 0.55;
         const patrolRadius =
           this.unitType === UnitType.BRIGADA_VOLUNTARIA
@@ -137,7 +139,7 @@ export class Brigadista extends Unit {
                 : 140;
         this.setCommandTarget(
           WORLD_CENTER_X + Math.cos(this.patrolAngle) * patrolRadius,
-          WORLD_CENTER_Y + Math.sin(this.patrolAngle) * patrolRadius
+          WORLD_CENTER_Y + Math.sin(this.patrolAngle) * (patrolRadius * ISO_Y_RATIO)
         );
       }
     }
@@ -145,7 +147,7 @@ export class Brigadista extends Unit {
     this.moveStep(deltaMs, smokeAtPos);
 
     // Combate automático ao fogo quando encosta no foco
-    if (targetFire && nearestDist <= 42) {
+    if (targetFire && nearestDist <= 46) {
       const fatigueFactor = this.stamina > 18 ? 1.0 : 0.45;
       const boostFactor = this.hasEquipmentBoost() ? 1.55 : 1.0;
       const power = this.extinguishPower * fatigueFactor * boostFactor * dtSec;
@@ -160,8 +162,8 @@ export class Brigadista extends Unit {
 
     // Fase 6: Se estiver cercando a Fortaleza do Burguês, causa dano contínuo
     if (boss && boss.isActive()) {
-      const distBoss = Phaser.Math.Distance.Between(this.x, this.y, boss.x, boss.y);
-      if (distBoss <= 62) {
+      const distBoss = getIsoDistance(this.x, this.y, boss.x, boss.y);
+      if (distBoss <= 68) {
         boss.takeDamage(12 * dtSec);
       }
     }
