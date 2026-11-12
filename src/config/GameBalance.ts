@@ -248,5 +248,11 @@ export const BALANCE = {
   SMOKE_COOLDOWN_MULT: 2.0,
   /** Limite máximo de unidades aliadas para manter tela mobile limpa e fluida */
   MAX_BRIGADISTAS: 6,
-  MAX_GUARDAS: 3
+  MAX_GUARDAS: 3,
+  /** Doação de cada casa da cidade às brigadas voluntárias */
+  HOUSE_DONATION: {
+    COOLDOWN_MS: 120000,
+    CONSCIOUSNESS_GAIN: 0.5,
+    BRIGADISTA_ENERGY_PERCENT: 5
+  }
 };

@@ -10,7 +10,6 @@ export class PixelArtGenerator {
   public static generateAll(scene: Phaser.Scene): void {
     this.generateHDShadow(scene);
     this.generateHDVoluntario(scene);
-    this.generateHDBrigadista(scene);
     this.generateHDGuarda(scene);
     this.generateHDIncendiario(scene);
     this.generateHDFire(scene);
@@ -158,67 +157,6 @@ export class PixelArtGenerator {
     this.line(ctx, 19, 42, 25, 42, '#18181b');
 
     this.finalizeCanvas(scene, 'unit_voluntario');
-  }
-
-  // 2. Brigadista Comunitário HD (36x44: capacete amarelo, uniforme laranja c/ faixas reflexivas, mangueira de água)
-  private static generateHDBrigadista(scene: Phaser.Scene): void {
-    const ctx = this.initCanvas(scene, 'unit_brigadista', 36, 44);
-    if (!ctx) return;
-
-    // Capacete amarelo florestal com faixa reflexiva e visor fumê
-    this.rect(ctx, 12, 4, 12, 3, '#fde047');
-    this.rect(ctx, 10, 7, 16, 4, '#facc15');
-    this.line(ctx, 11, 7, 25, 7, '#f8fafc');
-    this.rect(ctx, 12, 11, 12, 3, '#0f172a');
-    this.line(ctx, 14, 11, 18, 11, '#38bdf8');
-
-    // Rosto protegido
-    this.rect(ctx, 13, 14, 10, 5, '#d97706');
-    this.rect(ctx, 12, 17, 12, 3, '#15803d');
-
-    // Mochila costal de água e combate nas costas
-    this.rect(ctx, 24, 20, 5, 12, '#0284c7');
-    this.rect(ctx, 25, 21, 3, 10, '#38bdf8');
-
-    // Tronco: Uniforme anti-chamas laranja com faixas refletivas
-    this.rect(ctx, 11, 20, 14, 12, '#ea580c');
-    this.rect(ctx, 12, 21, 12, 10, '#c2410c');
-    this.line(ctx, 11, 24, 24, 24, '#fde047');
-    this.line(ctx, 11, 25, 24, 25, '#f8fafc');
-    this.line(ctx, 11, 28, 24, 28, '#15803d');
-
-    // Braços e mangueira de alta pressão
-    this.rect(ctx, 8, 22, 3, 7, '#ea580c');
-    this.rect(ctx, 24, 22, 3, 7, '#ea580c');
-    this.rect(ctx, 7, 28, 4, 3, '#18181b');
-    this.rect(ctx, 24, 28, 4, 3, '#18181b');
-
-    // Mangueira de lona azul
-    this.line(ctx, 27, 30, 24, 33, '#0284c7');
-    this.line(ctx, 24, 33, 18, 32, '#38bdf8');
-    this.line(ctx, 18, 32, 11, 29, '#0284c7');
-    // Esguicho metálico dourado
-    this.line(ctx, 10, 28, 4, 26, '#facc15');
-    this.line(ctx, 10, 29, 4, 27, '#ca8a04');
-    // Spray/jato d'água
-    this.px(ctx, 2, 25, '#38bdf8');
-    this.px(ctx, 1, 24, '#7dd3fc');
-    this.px(ctx, 0, 26, '#e0f2fe');
-
-    // Cinto e calça laranja com faixas
-    this.rect(ctx, 12, 32, 12, 2, '#18181b');
-    this.rect(ctx, 12, 34, 5, 6, '#ea580c');
-    this.rect(ctx, 19, 34, 5, 6, '#c2410c');
-    this.line(ctx, 12, 37, 16, 37, '#fde047');
-    this.line(ctx, 19, 37, 23, 37, '#fde047');
-
-    // Botas pesadas anti-calor
-    this.rect(ctx, 11, 40, 6, 3, '#18181b');
-    this.rect(ctx, 19, 40, 6, 3, '#18181b');
-    this.line(ctx, 11, 42, 17, 42, '#27272a');
-    this.line(ctx, 19, 42, 25, 42, '#27272a');
-
-    this.finalizeCanvas(scene, 'unit_brigadista');
   }
 
   // 3. Guarda Florestal Comunitário Armado HD (36x44: boina/cocar, uniforme tático camuflado, rádio e defesa)

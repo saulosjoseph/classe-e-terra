@@ -33,6 +33,7 @@ import { ActiveFireInstance, FireSmokeSystem } from '../systems/FireSmokeSystem'
 import { PoliticalPhaseSystem } from '../systems/PoliticalPhaseSystem';
 import { SectorSystem } from '../systems/SectorSystem';
 import { SpawnerSystem } from '../systems/SpawnerSystem';
+import { SpeechBubble } from '../ui/SpeechBubble';
 import {
   DifficultyConfig,
   DifficultyLevel,
@@ -53,6 +54,18 @@ export interface FollowableTarget {
   getLabel: () => string;
   isAlive?: () => boolean;
 }
+
+interface CityHouse {
+  id: number;
+  sprite: Phaser.GameObjects.Sprite;
+  /** Instante (tempo de jogo, em ms) em que a casa pode doar novamente */
+  readyAt: number;
+}
+
+const BRIGADISTA_INTRO_DELAY_MS = 3000;
+const BRIGADISTA_INTRO_STAMINA = 6;
+const BRIGADISTA_INTRO_TEXT =
+  'Estou exausto, preciso de um açaí para continuar protegendo nosso território!';
 
 export class GameScene extends Phaser.Scene {
   public difficulty!: DifficultyConfig;
@@ -109,6 +122,16 @@ export class GameScene extends Phaser.Scene {
   private isEnding = false;
   public isStoryModalOpen = true;
 
+  // Introdução: foco no Brigadista Voluntário e fala após o modal de contexto
+  private introStarted = false;
+  private introBrigadista: Brigadista | null = null;
+  private brigadistaSpeechBubble: SpeechBubble | null = null;
+
+  // Doações das casas da cidade (tempo de jogo, pausado com modais)
+  private cityHouses: CityHouse[] = [];
+  private gameTimeMs = 0;
+  private houseFocusContainer: Phaser.GameObjects.Container | null = null;
+
   constructor() {
     super('GameScene');
   }
@@ -127,6 +150,12 @@ export class GameScene extends Phaser.Scene {
     this.integratedActionsUsed = 0;
     this.isEnding = false;
     this.isStoryModalOpen = true;
+    this.introStarted = false;
+    this.introBrigadista = null;
+    this.brigadistaSpeechBubble = null;
+    this.cityHouses = [];
+    this.gameTimeMs = 0;
+    this.houseFocusContainer = null;
     this.isDraggingCamera = false;
     this.followedTarget = null;
     this.cameraZoom = 0.28125;
@@ -395,6 +424,172 @@ export class GameScene extends Phaser.Scene {
     return this.followedTarget;
   }
 
+  /**
+   * Foca o Brigadista Voluntário e, após 3 s, exibe a fala acima dele.
+   * Ocorre uma única vez por partida, pois o modal de contexto pode ser reaberto pelo HUD.
+   */
+  public startBrigadistaIntro(): void {
+    if (this.introStarted) return;
+    const voluntario = this.brigadistas[0];
+    if (!voluntario) return;
+
+    this.introStarted = true;
+    this.introBrigadista = voluntario;
+    voluntario.setStamina(BRIGADISTA_INTRO_STAMINA);
+    this.followEntity(voluntario);
+
+    this.time.delayedCall(BRIGADISTA_INTRO_DELAY_MS, () => {
+      if (this.isEnding || this.brigadistaSpeechBubble) return;
+
+      const bubble = new SpeechBubble(this, BRIGADISTA_INTRO_TEXT);
+      bubble.once('tap', () => this.events.emit('show-donation-info'));
+      bubble.once('destroy', () => {
+        if (this.brigadistaSpeechBubble === bubble) {
+          this.brigadistaSpeechBubble = null;
+          this.introBrigadista = null;
+        }
+      });
+      this.brigadistaSpeechBubble = bubble;
+      this.updateBrigadistaSpeechBubble();
+    });
+  }
+
+  // Mantém a ponta da cauda logo acima da cabeça do voluntário, mesmo com ele em movimento
+  private updateBrigadistaSpeechBubble(): void {
+    const bubble = this.brigadistaSpeechBubble;
+    const brig = this.introBrigadista;
+    if (!bubble || !brig) return;
+
+    const headY = brig.y - brig.sprite.displayHeight * brig.sprite.originY;
+    bubble.followAnchor(brig.x, headY - 6, this.cameras.main.zoom);
+  }
+
+  private createCityHouse(hx: number, hy: number): void {
+    const sprite = this.add.sprite(hx, hy, 'casa_isometrica');
+    sprite.setScale(0.60);
+    sprite.setOrigin(0.5, 0.88);
+    sprite.setDepth(hy);
+
+    const house: CityHouse = { id: this.cityHouses.length + 1, sprite, readyAt: 0 };
+    this.cityHouses.push(house);
+
+    sprite.setInteractive({ useHandCursor: true });
+    sprite.on('pointerup', (pointer: Phaser.Input.Pointer) => {
+      // Arrastar o mapa não conta como toque na casa
+      if (pointer.getDistance() > 10) return;
+      this.onCityHouseClicked(house);
+    });
+  }
+
+  private onCityHouseClicked(house: CityHouse): void {
+    if (this.isEnding || this.isStoryModalOpen) return;
+    SoundManager.unlock();
+    SoundManager.playSelect();
+    this.clearHouseFocus();
+    this.events.emit('house-clicked', house.id);
+  }
+
+  private findCityHouse(houseId: number): CityHouse | undefined {
+    return this.cityHouses.find((house) => house.id === houseId);
+  }
+
+  public getHouseCooldownRemainingMs(houseId: number): number {
+    const house = this.findCityHouse(houseId);
+    return house ? Math.max(0, house.readyAt - this.gameTimeMs) : 0;
+  }
+
+  /** Envia a doação da casa: +Consciência de Classe e +energia para todos os brigadistas. */
+  public donateFromHouse(houseId: number): boolean {
+    const house = this.findCityHouse(houseId);
+    if (!house || this.getHouseCooldownRemainingMs(houseId) > 0) return false;
+
+    const { COOLDOWN_MS, CONSCIOUSNESS_GAIN, BRIGADISTA_ENERGY_PERCENT } =
+      BALANCE.HOUSE_DONATION;
+    house.readyAt = this.gameTimeMs + COOLDOWN_MS;
+
+    this.phaseSystem.addConsciousness(CONSCIOUSNESS_GAIN, 'Doação de moradores');
+    for (const brig of this.brigadistas) {
+      brig.boostStaminaPercent(BRIGADISTA_ENERGY_PERCENT);
+    }
+
+    this.showDonationFeedback(house.sprite.x, house.sprite.y);
+    return true;
+  }
+
+  /** Centraliza a câmera numa casa aleatória e pede que o jogador toque em uma casa. */
+  public focusRandomHouse(): void {
+    if (this.cityHouses.length === 0) return;
+    const house = Phaser.Utils.Array.GetRandom(this.cityHouses);
+
+    this.stopFollowingEntity();
+    this.clearHouseFocus();
+    this.centerCameraOnPoint(house.sprite.x, house.sprite.y, true, false);
+    this.showHouseFocusIndicator(house.sprite.x, house.sprite.y);
+  }
+
+  private showHouseFocusIndicator(x: number, y: number): void {
+    const ring = this.add.ellipse(0, 0, 90, 46).setStrokeStyle(3, 0xfacc15, 1);
+    const label = this.add
+      .text(0, -62, 'Toque em uma casa para doar', {
+        fontFamily: 'Courier New, monospace',
+        fontSize: '12px',
+        fontStyle: 'bold',
+        color: '#fef08a',
+        backgroundColor: '#052e16dd',
+        padding: { x: 6, y: 3 }
+      })
+      .setOrigin(0.5);
+
+    this.tweens.add({
+      targets: ring,
+      scaleX: 1.15,
+      scaleY: 1.15,
+      alpha: 0.35,
+      yoyo: true,
+      repeat: -1,
+      duration: 650
+    });
+
+    this.houseFocusContainer = this.add
+      .container(x, y, [ring, label])
+      .setDepth(60000)
+      .setScale(1 / this.cameraZoom);
+  }
+
+  private clearHouseFocus(): void {
+    if (!this.houseFocusContainer) return;
+    this.tweens.killTweensOf(this.houseFocusContainer.getAll());
+    this.houseFocusContainer.destroy();
+    this.houseFocusContainer = null;
+  }
+
+  private showDonationFeedback(x: number, y: number): void {
+    const { CONSCIOUSNESS_GAIN, BRIGADISTA_ENERGY_PERCENT } = BALANCE.HOUSE_DONATION;
+    const gainText = String(CONSCIOUSNESS_GAIN).replace('.', ',');
+
+    const feedback = this.add
+      .text(x, y - 60, `+${gainText}% consciência\n+${BRIGADISTA_ENERGY_PERCENT}% energia`, {
+        fontFamily: 'Courier New, monospace',
+        fontSize: '12px',
+        fontStyle: 'bold',
+        color: '#86efac',
+        align: 'center',
+        stroke: '#052e16',
+        strokeThickness: 3
+      })
+      .setOrigin(0.5)
+      .setDepth(60000)
+      .setScale(1 / this.cameraZoom);
+
+    this.tweens.add({
+      targets: feedback,
+      y: y - 110,
+      alpha: 0,
+      duration: 1400,
+      onComplete: () => feedback.destroy()
+    });
+  }
+
   public getCameraCenterWorldPoint(): { x: number; y: number; sector: SectorType } {
     const cam = this.cameras.main;
     const cx = cam.scrollX + GAME_WIDTH / 2;
@@ -626,10 +821,7 @@ export class GameScene extends Phaser.Scene {
           const hx = cx + u - frontV;
           const hy = cy + (u + frontV) * 0.5;
 
-          const casa = this.add.sprite(hx, hy, 'casa_isometrica');
-          casa.setScale(0.60);
-          casa.setOrigin(0.5, 0.88);
-          casa.setDepth(hy);
+          this.createCityHouse(hx, hy);
         }
 
         // Fileira traseira (recuada no quarteirão com espaçamento nítido para o gramado)
@@ -640,10 +832,7 @@ export class GameScene extends Phaser.Scene {
           const hx = cx + u - backV;
           const hy = cy + (u + backV) * 0.5;
 
-          const casa = this.add.sprite(hx, hy, 'casa_isometrica');
-          casa.setScale(0.60);
-          casa.setOrigin(0.5, 0.88);
-          casa.setDepth(hy);
+          this.createCityHouse(hx, hy);
         }
       }
     }
@@ -923,6 +1112,9 @@ export class GameScene extends Phaser.Scene {
   public override update(_time: number, deltaMs: number): void {
     if (this.isEnding || this.isStoryModalOpen) return;
 
+    this.gameTimeMs += deltaMs;
+    this.houseFocusContainer?.setScale(1 / this.cameraZoom);
+
     // Suporte adicional a setas / WASD para mover a câmera caso jogue no computador
     const camSpeed = 0.42 * deltaMs;
     const cam = this.cameras.main;
@@ -989,11 +1181,14 @@ export class GameScene extends Phaser.Scene {
     }
 
     for (const brig of this.brigadistas) {
+      // Mantém a energia no mínimo durante a intro, senão a regeneração a recuperaria antes da fala
+      if (brig === this.introBrigadista) brig.setStamina(BRIGADISTA_INTRO_STAMINA);
       brig.update(deltaMs, this.fireSystem, this.boss);
     }
+    this.updateBrigadistaSpeechBubble();
 
     for (const guarda of this.guardas) {
-      guarda.update(deltaMs, this.fireSystem, arsonists, this.boss, (captured) =>
+      guarda.update(deltaMs, arsonists, this.boss, (captured) =>
         this.captureArsonist(captured)
       );
     }

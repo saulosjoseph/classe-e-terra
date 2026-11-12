@@ -33,7 +33,7 @@ export class Brigadista extends Unit {
       scene,
       id,
       isComunitario ? UnitType.BRIGADISTA_COMUNITARIO : UnitType.BRIGADA_VOLUNTARIA,
-      isComunitario ? 'unit_brigadista' : 'brigadista_voluntario',
+      isComunitario ? 'brigada_comunitaria' : 'brigadista_voluntario',
       x,
       y
     );
@@ -51,27 +51,32 @@ export class Brigadista extends Unit {
         this.sprite.play('brigadista_voluntario_idle');
       }
     } else {
-      this.sprite.setScale(1.0);
-      this.sprite.setOrigin(0.5, 0.88);
-      this.statusBarOffsetY = 28;
+      this.applyComunitarioCarVisuals();
+      this.sprite.play('comunitaria_idle');
     }
+  }
+
+  // Carro pickup: escala e origem na base das rodas, barra de energia acima do teto
+  private applyComunitarioCarVisuals(): void {
+    this.sprite.setScale(0.8);
+    this.sprite.setOrigin(0.5, 0.9375);
+    this.statusBarOffsetY = 98;
   }
 
   public evolveToComunitario(): void {
     if (this.unitType === UnitType.BRIGADISTA_COMUNITARIO) return;
     this.unitType = UnitType.BRIGADISTA_COMUNITARIO;
     this.sprite.stop();
-    this.sprite.setTexture('unit_brigadista');
-    this.sprite.setScale(1.0);
-    this.sprite.setOrigin(0.5, 0.88);
-    this.statusBarOffsetY = 28;
+    this.sprite.setTexture('brigada_comunitaria');
+    this.applyComunitarioCarVisuals();
+    this.sprite.play('comunitaria_idle');
     this.applyRoleStats(true);
     this.stamina = this.maxStamina;
   }
 
   private applyRoleStats(isComunitario: boolean): void {
     if (isComunitario) {
-      this.baseSpeed = 132;
+      this.baseSpeed = 200;
       this.extinguishPower = 36;
       this.maxStamina = 100;
     } else {
@@ -152,10 +157,10 @@ export class Brigadista extends Unit {
       const power = this.extinguishPower * fatigueFactor * boostFactor * dtSec;
       fireSystem.extinguishFire(targetFire.data.id, power);
 
-      const drainRate = this.unitType === UnitType.BRIGADA_VOLUNTARIA ? 13 : 5;
+      const drainRate = this.unitType === UnitType.BRIGADA_VOLUNTARIA ? 5 : 2;
       this.stamina = Math.max(5, this.stamina - drainRate * dtSec);
     } else {
-      const regenRate = smokeAtPos >= 3 ? 5 : 18;
+      const regenRate = smokeAtPos >= 3 ? 0.5 : 1;
       this.stamina = Math.min(this.maxStamina, this.stamina + regenRate * dtSec);
     }
 
@@ -174,23 +179,24 @@ export class Brigadista extends Unit {
   }
 
   private updateAnimation(isExtinguishing: boolean, targetFire: ActiveFireInstance | null): void {
-    if (this.unitType !== UnitType.BRIGADA_VOLUNTARIA) return;
+    const isComunitario = this.unitType === UnitType.BRIGADISTA_COMUNITARIO;
+    const prefix = isComunitario ? 'comunitaria' : 'brigadista_voluntario';
 
     if (isExtinguishing && targetFire) {
       // Direciona o soprador para o foco de incêndio
       if (Math.abs(targetFire.data.x - this.x) > 2) {
         this.sprite.setFlipX(targetFire.data.x < this.x);
       }
-      if (this.sprite.anims.currentAnim?.key !== 'brigadista_voluntario_extinguish') {
-        this.sprite.play('brigadista_voluntario_extinguish', true);
+      if (this.sprite.anims.currentAnim?.key !== `${prefix}_extinguish`) {
+        this.sprite.play(`${prefix}_extinguish`, true);
       }
     } else if (this.isMoving()) {
-      if (this.sprite.anims.currentAnim?.key !== 'brigadista_voluntario_walk') {
-        this.sprite.play('brigadista_voluntario_walk', true);
+      if (this.sprite.anims.currentAnim?.key !== `${prefix}_walk`) {
+        this.sprite.play(`${prefix}_walk`, true);
       }
     } else {
-      if (this.sprite.anims.currentAnim?.key !== 'brigadista_voluntario_idle') {
-        this.sprite.play('brigadista_voluntario_idle', true);
+      if (this.sprite.anims.currentAnim?.key !== `${prefix}_idle`) {
+        this.sprite.play(`${prefix}_idle`, true);
       }
     }
   }

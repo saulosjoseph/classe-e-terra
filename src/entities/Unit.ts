@@ -128,6 +128,14 @@ export abstract class Unit extends Phaser.Events.EventEmitter {
     this.targetY = clampedY;
   }
 
+  public setStamina(value: number): void {
+    this.stamina = Phaser.Math.Clamp(value, 0, this.maxStamina);
+  }
+
+  public boostStaminaPercent(percent: number): void {
+    this.stamina = Math.min(this.maxStamina, this.stamina + (this.maxStamina * percent) / 100);
+  }
+
   public applyEquipmentBoost(durationMs = 15000): void {
     this.equipmentBoostUntil = this.scene.time.now + durationMs;
     this.stamina = this.maxStamina;
@@ -210,12 +218,7 @@ export abstract class Unit extends Phaser.Events.EventEmitter {
     this.statusBar.fillStyle(0x090d0a, 0.85);
     this.statusBar.fillRect(this.x - w / 2, barY, w, h);
     const ratio = Phaser.Math.Clamp(this.stamina / this.maxStamina, 0, 1);
-    const color =
-      this.unitType === UnitType.GUARDA_FLORESTAL
-        ? 0x10b981
-        : ratio > 0.35
-          ? 0x38bdf8
-          : 0xf59e0b;
+    const color = ratio > 0.35 ? 0x38bdf8 : 0xf59e0b;
     this.statusBar.fillStyle(color, 1);
     this.statusBar.fillRect(this.x - w / 2, barY, w * ratio, h);
   }

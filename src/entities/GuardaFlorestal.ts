@@ -1,5 +1,4 @@
 import Phaser from 'phaser';
-import { FireSmokeSystem } from '../systems/FireSmokeSystem';
 import {
   CAMPO_RADIUS,
   FLORESTA_OUTER_RADIUS,
@@ -33,7 +32,6 @@ export class GuardaFlorestal extends Unit {
 
   public update(
     deltaMs: number,
-    fireSystem: FireSmokeSystem,
     arsonists: Incendiario[],
     boss: BossFortress | null,
     onArsonistCaptured: (arsonist: Incendiario) => void
@@ -58,48 +56,28 @@ export class GuardaFlorestal extends Unit {
     } else if (boss && boss.isActive()) {
       // 2. Se não há incendiários vivos e o Burguês está ativo, ataca a Fortaleza automaticamente!
       this.setCommandTarget(boss.x, boss.y);
-    } else {
-      // 3. Caso contrário, ajuda a apagar o foco de fogo mais próximo ou patrulha o anel da Floresta
-      const fires = fireSystem.getActiveFires();
-      if (fires.length > 0) {
-        let closestFire = fires[0];
-        let minFireDist = getIsoDistance(
-          this.x,
-          this.y,
-          closestFire.data.x,
-          closestFire.data.y
-        );
-        for (const f of fires) {
-          const fd = getIsoDistance(this.x, this.y, f.data.x, f.data.y);
-          if (fd < minFireDist) {
-            minFireDist = fd;
-            closestFire = f;
-          }
-        }
-        this.setCommandTarget(closestFire.data.x, closestFire.data.y);
-      } else if (!this.isMoving()) {
-        this.patrolAngle += 0.65;
-        const r = (CAMPO_RADIUS + FLORESTA_OUTER_RADIUS) / 2;
-        this.setCommandTarget(
-          WORLD_CENTER_X + Math.cos(this.patrolAngle) * r,
-          WORLD_CENTER_Y + Math.sin(this.patrolAngle) * (r * ISO_Y_RATIO)
-        );
-      }
+    } else if (!this.isMoving()) {
+      // 3. Sem incendiários nem Burguês ativo, patrulha o anel da Floresta
+      this.patrolAngle += 0.65;
+      const r = (CAMPO_RADIUS + FLORESTA_OUTER_RADIUS) / 2;
+      this.setCommandTarget(
+        WORLD_CENTER_X + Math.cos(this.patrolAngle) * r,
+        WORLD_CENTER_Y + Math.sin(this.patrolAngle) * (r * ISO_Y_RATIO)
+      );
     }
 
     this.moveStep(deltaMs, 0);
 
+    // Consome energia durante a perseguição e regenera fora dela
+    if (nearestEnemy) {
+      this.stamina = Math.max(5, this.stamina - 5 * dtSec);
+    } else {
+      this.stamina = Math.min(this.maxStamina, this.stamina + 18 * dtSec);
+    }
+
     // Emboscada instantânea contra Incendiário ao alcançar alcance de captura
     if (nearestEnemy && nearestEnemyDist <= 48) {
       onArsonistCaptured(nearestEnemy);
-    }
-
-    // Ajuda a conter fogo próximo
-    for (const f of fireSystem.getActiveFires()) {
-      if (getIsoDistance(this.x, this.y, f.data.x, f.data.y) <= 42) {
-        fireSystem.extinguishFire(f.data.id, 18 * dtSec);
-        break;
-      }
     }
 
     // Fase 6: Cerco armado contra a Fortaleza do Burguês
