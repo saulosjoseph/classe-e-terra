@@ -24,6 +24,8 @@ export abstract class Unit extends Phaser.Events.EventEmitter {
   public shadowSprite: Phaser.GameObjects.Sprite;
   public selectionRing: Phaser.GameObjects.Graphics;
   public statusBar: Phaser.GameObjects.Graphics;
+  public hitZone: Phaser.GameObjects.Zone;
+  protected isFollowed = false;
   protected scene: Phaser.Scene;
   protected baseSpeed = 108;
   protected stamina = 100;
@@ -65,7 +67,44 @@ export abstract class Unit extends Phaser.Events.EventEmitter {
     // Barra de energia flutuando acima da cabeça
     this.statusBar = scene.add.graphics().setDepth(21 + Math.floor(y));
 
+    // Zona de toque/clique interativa calibrada nos pés e corpo da unidade
+    this.hitZone = scene.add
+      .zone(x, y, 52, 62)
+      .setOrigin(0.5, 0.88)
+      .setInteractive({ useHandCursor: true })
+      .setDepth(35 + Math.floor(y));
+
+    this.hitZone.on('pointerup', (pointer: Phaser.Input.Pointer) => {
+      // Tolera até 10px de movimento para não conflitar com arraste panorâmico do mapa
+      if (pointer.getDistance() < 10) {
+        this.emit('unit-tapped', this);
+      }
+    });
+
     this.drawOverlays();
+  }
+
+  public setFollowed(followed: boolean): void {
+    if (this.isFollowed === followed) return;
+    this.isFollowed = followed;
+    this.drawOverlays();
+  }
+
+  public getIsFollowed(): boolean {
+    return this.isFollowed;
+  }
+
+  public getLabel(): string {
+    switch (this.unitType) {
+      case UnitType.BRIGADA_VOLUNTARIA:
+        return 'Brigadista Voluntário';
+      case UnitType.BRIGADISTA_COMUNITARIO:
+        return 'Brigadista Comunitário';
+      case UnitType.GUARDA_FLORESTAL:
+        return 'Guarda Florestal';
+      default:
+        return 'Unidade Popular';
+    }
   }
 
   public setCommandTarget(tx: number, ty: number): void {
@@ -141,11 +180,18 @@ export abstract class Unit extends Phaser.Events.EventEmitter {
     this.sprite.setPosition(this.x, this.y).setDepth(yDepth);
     this.shadowSprite.setPosition(this.x, this.y);
     this.statusBar.setDepth(yDepth + 1);
+    this.hitZone.setPosition(this.x, this.y).setDepth(yDepth + 15);
   }
 
   protected drawOverlays(): void {
     this.selectionRing.clear();
-    if (this.hasEquipmentBoost()) {
+    if (this.isFollowed) {
+      // Destaque dourado e branco pulsante indicando que a câmera está acompanhando esta unidade
+      this.selectionRing.lineStyle(2.5, 0xfacc15, 1.0);
+      this.selectionRing.strokeEllipse(this.x, this.y, 34, 17, 24);
+      this.selectionRing.lineStyle(1.5, 0xffffff, 0.9);
+      this.selectionRing.strokeEllipse(this.x, this.y, 40, 20, 24);
+    } else if (this.hasEquipmentBoost()) {
       this.selectionRing.lineStyle(2, 0xfacc15, 0.9);
       this.selectionRing.strokeEllipse(this.x, this.y, 30, 15, 24);
     } else {
@@ -175,6 +221,7 @@ export abstract class Unit extends Phaser.Events.EventEmitter {
   }
 
   public destroy(): void {
+    this.hitZone.destroy();
     this.sprite.destroy();
     this.shadowSprite.destroy();
     this.selectionRing.destroy();

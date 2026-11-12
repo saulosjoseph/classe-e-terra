@@ -45,6 +45,15 @@ import {
   UnitType
 } from '../types/GameTypes';
 
+export interface FollowableTarget {
+  id: string;
+  x: number;
+  y: number;
+  setFollowed: (followed: boolean) => void;
+  getLabel: () => string;
+  isAlive?: () => boolean;
+}
+
 export class GameScene extends Phaser.Scene {
   public difficulty!: DifficultyConfig;
   public phaseSystem!: PoliticalPhaseSystem;
@@ -52,6 +61,8 @@ export class GameScene extends Phaser.Scene {
   public sectorSystem!: SectorSystem;
   public spawnerSystem!: SpawnerSystem;
   public boss!: BossFortress;
+
+  private followedTarget: FollowableTarget | null = null;
 
   private forestHealth = BALANCE.INITIAL_FOREST_HEALTH;
   private brigadistas: Brigadista[] = [];
@@ -117,6 +128,7 @@ export class GameScene extends Phaser.Scene {
     this.isEnding = false;
     this.isStoryModalOpen = true;
     this.isDraggingCamera = false;
+    this.followedTarget = null;
     this.cameraZoom = 0.28125;
     this.isPinchingCamera = false;
     this.initialPinchDistance = 0;
@@ -255,6 +267,9 @@ export class GameScene extends Phaser.Scene {
       const dy = (pointer.y - this.dragStartPointerY) / cam.zoom;
 
       if (Math.hypot(dx, dy) > 3) {
+        if (Math.hypot(dx, dy) > 8 && this.followedTarget) {
+          this.stopFollowingEntity();
+        }
         cam.scrollX = Phaser.Math.Clamp(
           this.dragStartScrollX - dx,
           0,
@@ -314,7 +329,14 @@ export class GameScene extends Phaser.Scene {
     return this.cameraZoom;
   }
 
-  public centerCameraOnPoint(wx: number, wy: number, animate = true): void {
+  public centerCameraOnPoint(wx: number, wy: number, animate = true, cancelFollow = true): void {
+    if (cancelFollow && this.followedTarget) {
+      // Se a centralização for chamada para um ponto diferente da entidade seguida, cancela o acompanhamento
+      if (Math.hypot(this.followedTarget.x - wx, this.followedTarget.y - wy) > 20) {
+        this.stopFollowingEntity();
+      }
+    }
+
     const cam = this.cameras.main;
     const targetScrollX = Phaser.Math.Clamp(
       wx - GAME_WIDTH / 2,
@@ -339,6 +361,38 @@ export class GameScene extends Phaser.Scene {
       duration: 380,
       ease: 'Cubic.easeOut'
     });
+  }
+
+  public followEntity(target: FollowableTarget): void {
+    if (this.followedTarget === target) return;
+
+    if (this.followedTarget) {
+      this.followedTarget.setFollowed(false);
+    }
+
+    this.followedTarget = target;
+    target.setFollowed(true);
+
+    SoundManager.unlock();
+    SoundManager.playSelect();
+
+    // Centraliza suavemente na entidade ao iniciar o acompanhamento
+    this.centerCameraOnPoint(target.x, target.y, true, false);
+
+    this.events.emit('camera-follow-changed', target);
+  }
+
+  public stopFollowingEntity(): void {
+    if (!this.followedTarget) return;
+
+    this.followedTarget.setFollowed(false);
+    this.followedTarget = null;
+
+    this.events.emit('camera-follow-changed', null);
+  }
+
+  public getFollowedEntity(): FollowableTarget | null {
+    return this.followedTarget;
   }
 
   public getCameraCenterWorldPoint(): { x: number; y: number; sector: SectorType } {
@@ -668,6 +722,10 @@ export class GameScene extends Phaser.Scene {
     this.sectorSystem.on('integrated-action-executed', () => {
       this.integratedActionsUsed++;
     });
+
+    this.spawnerSystem.on('arsonist-tapped', (clicked: Incendiario) => {
+      this.followEntity(clicked);
+    });
   }
 
   private handlePhaseMilestone(phase: PoliticalPhaseDefinition): void {
@@ -733,6 +791,9 @@ export class GameScene extends Phaser.Scene {
       this.brigadistas.length
     );
     this.brigadistas.push(unit);
+    unit.on('unit-tapped', (clicked: Unit) => {
+      this.followEntity(clicked);
+    });
     if (focusCamera) {
       this.centerCameraOnPoint(x, y, true);
     }
@@ -747,6 +808,9 @@ export class GameScene extends Phaser.Scene {
     if (this.guardas.length >= BALANCE.MAX_GUARDAS) return null;
     const unit = new GuardaFlorestal(this, `guarda_${this.nextUnitId++}`, x, y);
     this.guardas.push(unit);
+    unit.on('unit-tapped', (clicked: Unit) => {
+      this.followEntity(clicked);
+    });
     if (focusCamera) {
       this.centerCameraOnPoint(x, y, true);
     }
@@ -862,11 +926,14 @@ export class GameScene extends Phaser.Scene {
     // Suporte adicional a setas / WASD para mover a câmera caso jogue no computador
     const camSpeed = 0.42 * deltaMs;
     const cam = this.cameras.main;
+    let manualKeyMove = false;
     if (this.cursors?.left.isDown || this.wasdKeys?.A.isDown) {
       cam.scrollX = Phaser.Math.Clamp(cam.scrollX - camSpeed, 0, WORLD_WIDTH - GAME_WIDTH);
+      manualKeyMove = true;
     }
     if (this.cursors?.right.isDown || this.wasdKeys?.D.isDown) {
       cam.scrollX = Phaser.Math.Clamp(cam.scrollX + camSpeed, 0, WORLD_WIDTH - GAME_WIDTH);
+      manualKeyMove = true;
     }
     if (this.cursors?.up.isDown || this.wasdKeys?.W.isDown) {
       cam.scrollY = Phaser.Math.Clamp(
@@ -874,6 +941,7 @@ export class GameScene extends Phaser.Scene {
         0,
         WORLD_HEIGHT - MAP_VIEWPORT_HEIGHT
       );
+      manualKeyMove = true;
     }
     if (this.cursors?.down.isDown || this.wasdKeys?.S.isDown) {
       cam.scrollY = Phaser.Math.Clamp(
@@ -881,6 +949,30 @@ export class GameScene extends Phaser.Scene {
         0,
         WORLD_HEIGHT - MAP_VIEWPORT_HEIGHT
       );
+      manualKeyMove = true;
+    }
+
+    if (manualKeyMove && this.followedTarget) {
+      this.stopFollowingEntity();
+    } else if (this.followedTarget) {
+      // Se a entidade tiver método isAlive e não estiver mais viva, interrompe
+      if (this.followedTarget.isAlive && !this.followedTarget.isAlive()) {
+        this.stopFollowingEntity();
+      } else {
+        // Interpola suavemente a câmera para manter a entidade acompanhada no centro
+        const targetScrollX = Phaser.Math.Clamp(
+          this.followedTarget.x - GAME_WIDTH / 2,
+          0,
+          WORLD_WIDTH - GAME_WIDTH
+        );
+        const targetScrollY = Phaser.Math.Clamp(
+          this.followedTarget.y - MAP_VIEWPORT_HEIGHT / 2,
+          0,
+          WORLD_HEIGHT - MAP_VIEWPORT_HEIGHT
+        );
+        cam.scrollX = Phaser.Math.Linear(cam.scrollX, targetScrollX, 0.08);
+        cam.scrollY = Phaser.Math.Linear(cam.scrollY, targetScrollY, 0.08);
+      }
     }
 
     this.sectorSystem.update(deltaMs);

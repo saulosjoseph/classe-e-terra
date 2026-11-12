@@ -65,6 +65,7 @@ export class UIScene extends Phaser.Scene {
   private defenseButtons: Map<string, TouchActionButton> = new Map();
   private minimapGraphics!: Phaser.GameObjects.Graphics;
   private currentSectorBadge!: Phaser.GameObjects.Text;
+  private cameraFollowChip!: Phaser.GameObjects.Text;
   private readonly minimapX = GAME_WIDTH - 48;
   private readonly minimapY = MAP_TOP_Y + 46;
   private readonly minimapRadius = 36;
@@ -182,6 +183,25 @@ export class UIScene extends Phaser.Scene {
         padding: { x: 6, y: 3 }
       })
       .setDepth(80);
+
+    this.cameraFollowChip = this.add
+      .text(12, MAP_TOP_Y + 32, '', {
+        fontFamily: 'Courier New, monospace',
+        fontSize: '10px',
+        fontStyle: 'bold',
+        color: '#fef08a',
+        backgroundColor: '#14532dee',
+        padding: { x: 7, y: 3 }
+      })
+      .setInteractive({ useHandCursor: true })
+      .setDepth(80)
+      .setVisible(false);
+
+    this.cameraFollowChip.on('pointerdown', () => {
+      SoundManager.unlock();
+      SoundManager.playSelect();
+      this.gameScene.stopFollowingEntity();
+    });
 
     const btnCity = this.add
       .text(12, MAP_BOTTOM_Y - 26, '🏙️ IR P/ CIDADE', {
@@ -873,7 +893,14 @@ export class UIScene extends Phaser.Scene {
         : viewInfo.sector === SectorType.CAMPO
           ? '🌾 CAMPO (Anel Médio)'
           : '🌳 FLORESTA (Anel Externo)';
-    this.currentSectorBadge.setText(`📍 ${sectorName} • Arraste p/ mover`);
+    const followed = this.gameScene.getFollowedEntity();
+    if (followed) {
+      this.cameraFollowChip
+        .setText(`🎥 ACOMPANHANDO: ${followed.getLabel().toUpperCase()} [✕ SOLTAR]`)
+        .setVisible(true);
+    } else {
+      this.cameraFollowChip.setVisible(false);
+    }
 
     const g = this.minimapGraphics;
     g.clear();
