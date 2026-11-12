@@ -89,9 +89,13 @@ export class UIScene extends Phaser.Scene {
     this.createStoryModal();
 
     this.gameScene.events.on('show-donation-info', this.showDonationInfoModal, this);
+    this.gameScene.events.on('show-trabalhador-info', this.showTrabalhadorInfoModal, this);
+    this.gameScene.events.on('prefeitura-clicked', this.showPrefeituraInfoModal, this);
     this.gameScene.events.on('house-clicked', this.showHouseDonationPanel, this);
     this.events.once('shutdown', () => {
       this.gameScene.events.off('show-donation-info', this.showDonationInfoModal, this);
+      this.gameScene.events.off('show-trabalhador-info', this.showTrabalhadorInfoModal, this);
+      this.gameScene.events.off('prefeitura-clicked', this.showPrefeituraInfoModal, this);
       this.gameScene.events.off('house-clicked', this.showHouseDonationPanel, this);
     });
 
@@ -855,6 +859,156 @@ export class UIScene extends Phaser.Scene {
     modalContainer.add([backdrop, boxBg, innerBorder, contentText, okBtn, okText]);
   }
 
+  public showTrabalhadorInfoModal(): void {
+    if (!this.gameScene) return;
+    this.gameScene.isStoryModalOpen = true;
+
+    const infoText =
+      'O poder público tem à disposição equipamentos que podem ser distribuídos para as comunidades rurais.';
+
+    const modalContainer = this.add.container(0, 0).setDepth(201);
+
+    const backdrop = this.add
+      .rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.82)
+      .setInteractive();
+
+    const boxW = 630;
+    const boxH = 220;
+    const boxX = GAME_WIDTH / 2;
+    const boxY = GAME_HEIGHT / 2;
+
+    const boxBg = this.add
+      .rectangle(boxX, boxY, boxW, boxH, 0x090d0a, 0.98)
+      .setStrokeStyle(2.5, 0xfacc15);
+
+    const innerBorder = this.add
+      .rectangle(boxX, boxY, boxW - 10, boxH - 10, 0x000000, 0)
+      .setStrokeStyle(1, 0x15803d);
+
+    const contentText = this.add
+      .text(boxX, boxY - 22, infoText, {
+        fontFamily: 'Courier New, monospace',
+        fontSize: '12px',
+        color: '#f4f4f5',
+        align: 'left',
+        lineSpacing: 5,
+        wordWrap: { width: boxW - 60 }
+      })
+      .setOrigin(0.5);
+
+    const btnW = 240;
+    const btnH = 36;
+    const btnY = boxY + boxH / 2 - 30;
+
+    const prefeituraBtn = this.add
+      .rectangle(boxX, btnY, btnW, btnH, 0x16a34a, 1)
+      .setStrokeStyle(2, 0x86efac)
+      .setInteractive({ useHandCursor: true });
+
+    const prefeituraText = this.add
+      .text(boxX, btnY, 'Ir para a prefeitura', {
+        fontFamily: 'Courier New, monospace',
+        fontSize: '12px',
+        fontStyle: 'bold',
+        color: '#052e16'
+      })
+      .setOrigin(0.5);
+
+    const closeModal = () => {
+      SoundManager.unlock();
+      if (this.gameScene) {
+        this.gameScene.isStoryModalOpen = false;
+      }
+      modalContainer.destroy();
+    };
+
+    prefeituraBtn.on('pointerdown', () => {
+      closeModal();
+      this.gameScene.focusPrefeitura();
+    });
+    backdrop.on('pointerdown', closeModal);
+
+    modalContainer.add([backdrop, boxBg, innerBorder, contentText, prefeituraBtn, prefeituraText]);
+  }
+
+  public showPrefeituraInfoModal(): void {
+    if (!this.gameScene) return;
+    this.gameScene.isStoryModalOpen = true;
+
+    const infoText =
+      'A prefeitura possui necessidades legais para atuar dentro da ordem. Ela responderá ao pedido dos trabalhadores rurais em um prazo de 15 dias.\n\nMas o governo federal pode ajudar.';
+
+    const modalContainer = this.add.container(0, 0).setDepth(201);
+
+    const backdrop = this.add
+      .rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.82)
+      .setInteractive();
+
+    const boxW = 630;
+    const boxH = 220;
+    const boxX = GAME_WIDTH / 2;
+    const boxY = GAME_HEIGHT / 2;
+
+    const boxBg = this.add
+      .rectangle(boxX, boxY, boxW, boxH, 0x090d0a, 0.98)
+      .setStrokeStyle(2.5, 0xfacc15);
+
+    const innerBorder = this.add
+      .rectangle(boxX, boxY, boxW - 10, boxH - 10, 0x000000, 0)
+      .setStrokeStyle(1, 0x15803d);
+
+    const title = this.add
+      .text(boxX, boxY - boxH / 2 + 28, 'PREFEITURA', {
+        fontFamily: 'Courier New, monospace',
+        fontSize: '13px',
+        fontStyle: 'bold',
+        color: '#fde047'
+      })
+      .setOrigin(0.5);
+
+    const contentText = this.add
+      .text(boxX, boxY + 4, infoText, {
+        fontFamily: 'Courier New, monospace',
+        fontSize: '12px',
+        color: '#f4f4f5',
+        align: 'left',
+        lineSpacing: 5,
+        wordWrap: { width: boxW - 60 }
+      })
+      .setOrigin(0.5);
+
+    const btnW = 220;
+    const btnH = 36;
+    const btnY = boxY + boxH / 2 - 30;
+
+    const closeBtn = this.add
+      .rectangle(boxX, btnY, btnW, btnH, 0x27272a, 1)
+      .setStrokeStyle(2, 0x71717a)
+      .setInteractive({ useHandCursor: true });
+
+    const closeText = this.add
+      .text(boxX, btnY, 'Fechar', {
+        fontFamily: 'Courier New, monospace',
+        fontSize: '12px',
+        fontStyle: 'bold',
+        color: '#f4f4f5'
+      })
+      .setOrigin(0.5);
+
+    const closeModal = () => {
+      SoundManager.unlock();
+      if (this.gameScene) {
+        this.gameScene.isStoryModalOpen = false;
+      }
+      modalContainer.destroy();
+    };
+
+    closeBtn.on('pointerdown', closeModal);
+    backdrop.on('pointerdown', closeModal);
+
+    modalContainer.add([backdrop, boxBg, innerBorder, title, contentText, closeBtn, closeText]);
+  }
+
   public showHouseDonationPanel(houseId: number): void {
     if (!this.gameScene) return;
     this.gameScene.isStoryModalOpen = true;
@@ -887,11 +1041,15 @@ export class UIScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
+    const donationBlocked = this.gameScene.isHouseDonationBlocked();
+
     const infoText = this.add
       .text(
         boxX,
         boxY - 20,
-        'Esta casa pode enviar uma doação a cada 2 minutos. Cada doação aumenta a Consciência de Classe e devolve energia aos brigadistas.',
+        donationBlocked
+          ? 'Os brigadistas agradecem muito, mas não estão mais aceitando doações porque não possuem pessoal nem estrutura para a quantidade de doações recebidas.'
+          : 'Esta casa pode enviar uma doação a cada 2 minutos. Cada doação aumenta a Consciência de Classe e devolve energia aos brigadistas.',
         {
           fontFamily: 'Courier New, monospace',
           fontSize: '12px',
@@ -906,32 +1064,35 @@ export class UIScene extends Phaser.Scene {
     const remainingMs = this.gameScene.getHouseCooldownRemainingMs(houseId);
     const onCooldown = remainingMs > 0;
     const remainingSec = Math.ceil(remainingMs / 1000);
-    const statusLabel = onCooldown
-      ? `Disponível em ${Math.floor(remainingSec / 60)}:${String(remainingSec % 60).padStart(2, '0')}`
-      : 'Disponível agora';
+    const statusLabel = donationBlocked
+      ? 'Brigadistas com energia cheia'
+      : onCooldown
+        ? `Disponível em ${Math.floor(remainingSec / 60)}:${String(remainingSec % 60).padStart(2, '0')}`
+        : 'Disponível agora';
 
     const statusText = this.add
       .text(boxX, boxY + 38, statusLabel, {
         fontFamily: 'Courier New, monospace',
         fontSize: '11px',
         fontStyle: 'bold',
-        color: onCooldown ? '#fca5a5' : '#86efac'
+        color: onCooldown || donationBlocked ? '#fca5a5' : '#86efac'
       })
       .setOrigin(0.5);
 
     const btnY = boxY + boxH / 2 - 32;
+    const cannotDonate = onCooldown || donationBlocked;
 
     const donateBtn = this.add
-      .rectangle(boxX - 70, btnY, 340, 38, onCooldown ? 0x3f3f46 : 0x16a34a, 1)
-      .setStrokeStyle(2, onCooldown ? 0x71717a : 0x86efac);
-    if (!onCooldown) donateBtn.setInteractive({ useHandCursor: true });
+      .rectangle(boxX - 70, btnY, 340, 38, cannotDonate ? 0x3f3f46 : 0x16a34a, 1)
+      .setStrokeStyle(2, cannotDonate ? 0x71717a : 0x86efac);
+    if (!cannotDonate) donateBtn.setInteractive({ useHandCursor: true });
 
     const donateText = this.add
       .text(boxX - 70, btnY, 'Enviar doação para brigadistas', {
         fontFamily: 'Courier New, monospace',
         fontSize: '12px',
         fontStyle: 'bold',
-        color: onCooldown ? '#a1a1aa' : '#052e16'
+        color: cannotDonate ? '#a1a1aa' : '#052e16'
       })
       .setOrigin(0.5);
 

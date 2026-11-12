@@ -41,6 +41,12 @@ O avanço da Consciência Coletiva faz nascer unidades móveis que interagem dir
 * **Desbloqueio:** Aos 50% de Consciência (após derrubar o Ajuste Fiscal).
 * **Impacto no Jogo:** Unidade de elite na Floresta. Move-se sem lentidão pela fumaça densa, revela áreas escondidas e captura Incendiários instantaneamente através de emboscadas, impedindo que o fogo sequer comece.
 
+### 🌾 Os Trabalhadores da Zona Rural (Apoio Lento)
+* **Presença:** Dois trabalhadores rurais (variantes A e B) já aparecem no início da partida, no Campo.
+* **Impacto no Jogo:** Apagam o fogo como o Brigadista, porém com muito mais lentidão e menos força de extinção. Vão até o foco ativo mais próximo em qualquer setor e voltam ao ponto de descanso quando não há incêndio.
+* **Quantidade:** Escala com o fogo, na proporção de 1 trabalhador para cada 3 focos ativos, com mínimo de 2. Ao diminuir o fogo, só são removidos os trabalhadores ociosos, sem interromper quem está apagando.
+* **Primeira doação:** Após a primeira doação de uma casa às brigadas, a câmera foca no trabalhador mais próximo de um foco ativo, com um balão dizendo que os trabalhadores combatem o fogo sem equipamentos e sem treinamento, correndo risco de vida. Aparece uma única vez por partida. Tocar no balão abre um aviso de que o poder público tem equipamentos para distribuir às comunidades rurais, com o botão "Ir para a prefeitura", que foca a câmera na prefeitura. A prefeitura fica destacada e clicável: ao tocar, um aviso informa que ela possui necessidades legais para atuar dentro da ordem, responderá ao pedido dos trabalhadores rurais em até 15 dias, e que o governo federal pode ajudar.
+
 ## 4. Os Inimigos e a Dinâmica de Destruição
 
 1. **Os Incendiários (Agentes do Caos):** Surgem nas bordas e pontos cegos da mata, ateiam fogo e tentam fugir.

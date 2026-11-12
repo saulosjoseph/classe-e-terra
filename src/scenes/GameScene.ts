@@ -28,6 +28,7 @@ import { BossFortress } from '../entities/BossFortress';
 import { Brigadista } from '../entities/Brigadista';
 import { GuardaFlorestal } from '../entities/GuardaFlorestal';
 import { Incendiario } from '../entities/Incendiario';
+import { TrabalhadorRural, TrabalhadorRuralVariant } from '../entities/TrabalhadorRural';
 import { Unit } from '../entities/Unit';
 import { ActiveFireInstance, FireSmokeSystem } from '../systems/FireSmokeSystem';
 import { PoliticalPhaseSystem } from '../systems/PoliticalPhaseSystem';
@@ -66,6 +67,8 @@ const BRIGADISTA_INTRO_DELAY_MS = 3000;
 const BRIGADISTA_INTRO_STAMINA = 6;
 const BRIGADISTA_INTRO_TEXT =
   'Estou exausto, preciso de um açaí para continuar protegendo nosso território!';
+const TRABALHADOR_INTRO_TEXT =
+  'Os trabalhadores estão combatendo o fogo sem equipamentos e sem treinamento, correndo risco de vida!';
 
 export class GameScene extends Phaser.Scene {
   public difficulty!: DifficultyConfig;
@@ -80,6 +83,7 @@ export class GameScene extends Phaser.Scene {
   private forestHealth = BALANCE.INITIAL_FOREST_HEALTH;
   private brigadistas: Brigadista[] = [];
   private guardas: GuardaFlorestal[] = [];
+  private trabalhadoresRurais: TrabalhadorRural[] = [];
   private nextUnitId = 1;
 
   private spawnBrigadistaReadyAt = 0;
@@ -127,8 +131,16 @@ export class GameScene extends Phaser.Scene {
   private introBrigadista: Brigadista | null = null;
   private brigadistaSpeechBubble: SpeechBubble | null = null;
 
+  // Após a primeira doação: foco em um Trabalhador Rural e fala sobre o risco de combate sem equipamentos
+  private trabalhadorIntroShown = false;
+  private introTrabalhador: TrabalhadorRural | null = null;
+  private trabalhadorSpeechBubble: SpeechBubble | null = null;
+
   // Doações das casas da cidade (tempo de jogo, pausado com modais)
   private cityHouses: CityHouse[] = [];
+  private prefeituraPos: { x: number; y: number } | null = null;
+  private prefeituraSprite: Phaser.GameObjects.Sprite | null = null;
+  private prefeituraFocusContainer: Phaser.GameObjects.Container | null = null;
   private gameTimeMs = 0;
   private houseFocusContainer: Phaser.GameObjects.Container | null = null;
 
@@ -142,6 +154,7 @@ export class GameScene extends Phaser.Scene {
     this.forestHealth = BALANCE.INITIAL_FOREST_HEALTH;
     this.brigadistas = [];
     this.guardas = [];
+    this.trabalhadoresRurais = [];
     this.nextUnitId = 1;
     this.spawnBrigadistaReadyAt = 0;
     this.spawnGuardaReadyAt = 0;
@@ -153,10 +166,13 @@ export class GameScene extends Phaser.Scene {
     this.introStarted = false;
     this.introBrigadista = null;
     this.brigadistaSpeechBubble = null;
+    this.trabalhadorIntroShown = false;
+    this.introTrabalhador = null;
+    this.trabalhadorSpeechBubble = null;
     this.cityHouses = [];
     this.gameTimeMs = 0;
     this.houseFocusContainer = null;
-    this.isDraggingCamera = false;
+    this.prefeituraFocusContainer = null;
     this.followedTarget = null;
     this.cameraZoom = 0.28125;
     this.isPinchingCamera = false;
@@ -184,21 +200,37 @@ export class GameScene extends Phaser.Scene {
 
     this.indigenousShieldGraphics = this.add.graphics().setDepth(15);
 
-    // Estado inicial do GDD (Fase 1):
-    // 1 Brigada Voluntária restrita ao anel da Floresta (posicionada ao sul da Cidade, na borda interna da Floresta)
-    this.spawnBrigadistaUnit(
-      WORLD_CENTER_X,
-      WORLD_CENTER_Y + CAMPO_RADIUS_Y + 28,
-      false,
-      false
-    );
+    // Personagens iniciais em lados opostos da Floresta: Brigadista ao Sul e os dois
+    // Trabalhadores Rurais ao Norte. Cada personagem nasce com 3 focos próximos de si.
+    const southSpot = { x: WORLD_CENTER_X + 60, y: WORLD_CENTER_Y + CAMPO_RADIUS_Y + 55 };
+    const northSpotY = WORLD_CENTER_Y - CAMPO_RADIUS_Y - 55;
+    const northSpots = [
+      { x: WORLD_CENTER_X - 240, y: northSpotY },
+      { x: WORLD_CENTER_X + 240, y: northSpotY }
+    ];
+    // Focos a 55px do personagem e um logo acima: ficam separados entre si e o mais próximo fica ao alcance de combate
+    const initialFireOffsets: [number, number][] = [
+      [-55, 0],
+      [55, 0],
+      [0, -20]
+    ];
+    for (const spot of [southSpot, ...northSpots]) {
+      for (const [dx, dy] of initialFireOffsets) {
+        this.fireSystem.spawnFire(spot.x + dx, spot.y + dy, 22);
+      }
+    }
 
-    // Cria 1 foco inicial na Floresta ao Sul para o jogador explorar o mapa
-    this.fireSystem.spawnFire(
-      WORLD_CENTER_X + 60,
-      WORLD_CENTER_Y + CAMPO_RADIUS_Y + 55,
-      22
-    );
+    // Estado inicial do GDD (Fase 1): 1 Brigada Voluntária restrita ao anel da Floresta
+    const brigadista = this.spawnBrigadistaUnit(southSpot.x, southSpot.y, false, false);
+    // Atualização com dt 0: sem movimento nem dano, só aplica a animação de combate
+    // (o loop de update fica pausado enquanto o modal de história está aberto)
+    brigadista?.update(0, this.fireSystem, this.boss);
+
+    // 1 Trabalhador Rural de cada tipo, cada um no centro de um dos grupos de focos do Norte
+    (['a', 'b'] as TrabalhadorRuralVariant[]).forEach((variant, i) => {
+      const worker = this.spawnTrabalhadorRuralUnit(northSpots[i].x, northSpots[i].y, variant);
+      worker.update(0, this.fireSystem);
+    });
 
     // Inicia a câmera posicionada no Campo (Anel Médio), enquadrando Floresta, Campo e Cidade conforme imagem de referência
     this.centerCameraOnPoint(1864, 3994.5, false);
@@ -454,14 +486,124 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  // Mantém a ponta da cauda logo acima da cabeça do voluntário, mesmo com ele em movimento
-  private updateBrigadistaSpeechBubble(): void {
-    const bubble = this.brigadistaSpeechBubble;
-    const brig = this.introBrigadista;
-    if (!bubble || !brig) return;
+  /**
+   * Foca um Trabalhador Rural (o mais próximo de um foco ativo) e exibe a fala sobre o risco do combate.
+   * Ocorre uma única vez por partida, na primeira doação de uma casa.
+   */
+  private startTrabalhadorIntro(): void {
+    if (this.trabalhadorIntroShown || this.isEnding) return;
+    const trabalhador = this.findTrabalhadorNearestFire();
+    if (!trabalhador) return;
 
-    const headY = brig.y - brig.sprite.displayHeight * brig.sprite.originY;
-    bubble.followAnchor(brig.x, headY - 6, this.cameras.main.zoom);
+    this.trabalhadorIntroShown = true;
+    this.introTrabalhador = trabalhador;
+    this.followEntity(trabalhador);
+
+    const bubble = new SpeechBubble(this, TRABALHADOR_INTRO_TEXT);
+    bubble.once('tap', () => this.events.emit('show-trabalhador-info'));
+    bubble.once('destroy', () => {
+      if (this.trabalhadorSpeechBubble === bubble) {
+        this.trabalhadorSpeechBubble = null;
+        this.introTrabalhador = null;
+      }
+    });
+    this.trabalhadorSpeechBubble = bubble;
+    this.updateTrabalhadorSpeechBubble();
+  }
+
+  private findTrabalhadorNearestFire(): TrabalhadorRural | null {
+    if (this.trabalhadoresRurais.length === 0) return null;
+
+    const fires = this.fireSystem.getActiveFires();
+    if (fires.length === 0) return this.trabalhadoresRurais[0];
+
+    let best: TrabalhadorRural | null = null;
+    let bestDist = Infinity;
+    for (const trabalhador of this.trabalhadoresRurais) {
+      for (const fire of fires) {
+        const d = getIsoDistance(trabalhador.x, trabalhador.y, fire.data.x, fire.data.y);
+        if (d < bestDist) {
+          bestDist = d;
+          best = trabalhador;
+        }
+      }
+    }
+    return best;
+  }
+
+  // Mantém a ponta da cauda logo acima da cabeça do personagem, mesmo com ele em movimento
+  private updateBrigadistaSpeechBubble(): void {
+    this.anchorSpeechBubble(this.brigadistaSpeechBubble, this.introBrigadista);
+  }
+
+  private updateTrabalhadorSpeechBubble(): void {
+    this.anchorSpeechBubble(this.trabalhadorSpeechBubble, this.introTrabalhador);
+  }
+
+  private anchorSpeechBubble(bubble: SpeechBubble | null, unit: Unit | null): void {
+    if (!bubble || !unit) return;
+
+    const headY = unit.y - unit.sprite.displayHeight * unit.sprite.originY;
+    bubble.followAnchor(unit.x, headY - 6, this.cameras.main.zoom);
+  }
+
+  /** Centraliza a câmera na prefeitura (Palácio Municipal) e a destaca para toque. */
+  public focusPrefeitura(): void {
+    if (!this.prefeituraPos || !this.prefeituraSprite) return;
+    this.stopFollowingEntity();
+    this.clearHouseFocus();
+    this.clearPrefeituraFocus();
+    this.centerCameraOnPoint(this.prefeituraPos.x, this.prefeituraPos.y, true, false);
+    this.showPrefeituraFocusIndicator();
+  }
+
+  private showPrefeituraFocusIndicator(): void {
+    if (!this.prefeituraSprite) return;
+    const base = this.prefeituraSprite.getBottomCenter();
+    const top = this.prefeituraSprite.getTopCenter();
+
+    const ring = this.add.ellipse(0, 0, 380, 190).setStrokeStyle(4, 0xfacc15, 1);
+    const label = this.add
+      .text(0, 0, 'Toque na prefeitura', {
+        fontFamily: 'Courier New, monospace',
+        fontSize: '12px',
+        fontStyle: 'bold',
+        color: '#fef08a',
+        backgroundColor: '#052e16dd',
+        padding: { x: 6, y: 3 }
+      })
+      .setOrigin(0.5, 1);
+    label.setY(-ring.height / 2 - 6);
+
+    this.tweens.add({
+      targets: ring,
+      scaleX: 1.12,
+      scaleY: 1.12,
+      alpha: 0.35,
+      yoyo: true,
+      repeat: -1,
+      duration: 650
+    });
+
+    this.prefeituraFocusContainer = this.add
+      .container(base.x, base.y - (base.y - top.y) * 0.5, [ring, label])
+      .setDepth(60000)
+      .setScale(1 / this.cameraZoom);
+  }
+
+  private clearPrefeituraFocus(): void {
+    if (!this.prefeituraFocusContainer) return;
+    this.tweens.killTweensOf(this.prefeituraFocusContainer.getAll());
+    this.prefeituraFocusContainer.destroy();
+    this.prefeituraFocusContainer = null;
+  }
+
+  private onPrefeituraClicked(): void {
+    if (this.isEnding || this.isStoryModalOpen) return;
+    SoundManager.unlock();
+    SoundManager.playSelect();
+    this.clearPrefeituraFocus();
+    this.events.emit('prefeitura-clicked');
   }
 
   private createCityHouse(hx: number, hy: number): void {
@@ -486,6 +628,7 @@ export class GameScene extends Phaser.Scene {
     SoundManager.unlock();
     SoundManager.playSelect();
     this.clearHouseFocus();
+    this.clearPrefeituraFocus();
     this.events.emit('house-clicked', house.id);
   }
 
@@ -498,10 +641,16 @@ export class GameScene extends Phaser.Scene {
     return house ? Math.max(0, house.readyAt - this.gameTimeMs) : 0;
   }
 
+  /** Doações são bloqueadas quando todos os brigadistas já estão com energia cheia. */
+  public isHouseDonationBlocked(): boolean {
+    return this.brigadistas.length > 0 && this.brigadistas.every((brig) => brig.getStaminaRatio() >= 1);
+  }
+
   /** Envia a doação da casa: +Consciência de Classe e +energia para todos os brigadistas. */
   public donateFromHouse(houseId: number): boolean {
     const house = this.findCityHouse(houseId);
     if (!house || this.getHouseCooldownRemainingMs(houseId) > 0) return false;
+    if (this.isHouseDonationBlocked()) return false;
 
     const { COOLDOWN_MS, CONSCIOUSNESS_GAIN, BRIGADISTA_ENERGY_PERCENT } =
       BALANCE.HOUSE_DONATION;
@@ -513,6 +662,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.showDonationFeedback(house.sprite.x, house.sprite.y);
+    this.startTrabalhadorIntro();
     return true;
   }
 
@@ -523,6 +673,7 @@ export class GameScene extends Phaser.Scene {
 
     this.stopFollowingEntity();
     this.clearHouseFocus();
+    this.clearPrefeituraFocus();
     this.centerCameraOnPoint(house.sprite.x, house.sprite.y, true, false);
     this.showHouseFocusIndicator(house.sprite.x, house.sprite.y);
   }
@@ -749,6 +900,13 @@ export class GameScene extends Phaser.Scene {
           prefeitura.setOrigin(0.5, 0.652);
           prefeitura.setScale(330 / 2477);
           prefeitura.setDepth(hy + 10);
+          prefeitura.setInteractive({ useHandCursor: true });
+          prefeitura.on('pointerup', (pointer: Phaser.Input.Pointer) => {
+            if (pointer.getDistance() > 10) return;
+            this.onPrefeituraClicked();
+          });
+          this.prefeituraSprite = prefeitura;
+          this.prefeituraPos = { x: hx, y: hy - 4 };
           continue;
         }
 
@@ -1006,6 +1164,59 @@ export class GameScene extends Phaser.Scene {
     return unit;
   }
 
+  public spawnTrabalhadorRuralUnit(
+    x: number,
+    y: number,
+    variant: TrabalhadorRuralVariant
+  ): TrabalhadorRural {
+    const unit = new TrabalhadorRural(this, `trab_${this.nextUnitId++}`, x, y, variant);
+    this.trabalhadoresRurais.push(unit);
+    unit.on('unit-tapped', (clicked: Unit) => {
+      this.followEntity(clicked);
+    });
+    return unit;
+  }
+
+  /**
+   * Mantém 1 Trabalhador Rural para cada N focos ativos (mínimo fixo).
+   * Ao diminuir o fogo, só remove os que estão ociosos, sem apagar nenhum foco.
+   */
+  private updateTrabalhadoresRurais(): void {
+    const { MIN_COUNT, FIRES_PER_WORKER } = BALANCE.TRABALHADOR_RURAL;
+    const activeFires = this.fireSystem.getActiveFires().length;
+    const targetCount = Math.max(MIN_COUNT, Math.ceil(activeFires / FIRES_PER_WORKER));
+
+    while (this.trabalhadoresRurais.length < targetCount) {
+      const countA = this.trabalhadoresRurais.filter((t) => t.variant === 'a').length;
+      const countB = this.trabalhadoresRurais.length - countA;
+      const variant: TrabalhadorRuralVariant = countA <= countB ? 'a' : 'b';
+      const pt = getRandomPointInSector(SectorType.CAMPO, 36);
+      this.spawnTrabalhadorRuralUnit(pt.x, pt.y, variant);
+    }
+
+    while (this.trabalhadoresRurais.length > targetCount) {
+      const idleIndex = this.findLastIdleTrabalhadorIndex();
+      if (idleIndex < 0) break;
+      const [removed] = this.trabalhadoresRurais.splice(idleIndex, 1);
+      if (this.getFollowedEntity() === removed) {
+        this.stopFollowingEntity();
+      }
+      if (this.introTrabalhador === removed) {
+        this.trabalhadorSpeechBubble?.destroy();
+        this.trabalhadorSpeechBubble = null;
+        this.introTrabalhador = null;
+      }
+      removed.destroy();
+    }
+  }
+
+  private findLastIdleTrabalhadorIndex(): number {
+    for (let i = this.trabalhadoresRurais.length - 1; i >= 0; i--) {
+      if (!this.trabalhadoresRurais[i].isWorking()) return i;
+    }
+    return -1;
+  }
+
   public tryRecruitBrigadista(): boolean {
     if (!this.phaseSystem.isBrigadaComunitariaUnlocked()) return false;
     if (this.brigadistas.length >= BALANCE.MAX_BRIGADISTAS) return false;
@@ -1049,7 +1260,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   public getAllUnits(): Unit[] {
-    return [...this.brigadistas, ...this.guardas];
+    return [...this.brigadistas, ...this.guardas, ...this.trabalhadoresRurais];
   }
 
   public getForestHealth(): number {
@@ -1114,6 +1325,7 @@ export class GameScene extends Phaser.Scene {
 
     this.gameTimeMs += deltaMs;
     this.houseFocusContainer?.setScale(1 / this.cameraZoom);
+    this.prefeituraFocusContainer?.setScale(1 / this.cameraZoom);
 
     // Suporte adicional a setas / WASD para mover a câmera caso jogue no computador
     const camSpeed = 0.42 * deltaMs;
@@ -1192,6 +1404,12 @@ export class GameScene extends Phaser.Scene {
         this.captureArsonist(captured)
       );
     }
+
+    for (const trabalhador of this.trabalhadoresRurais) {
+      trabalhador.update(deltaMs, this.fireSystem);
+    }
+    this.updateTrabalhadoresRurais();
+    this.updateTrabalhadorSpeechBubble();
 
     const { forestDamage } = this.fireSystem.update(
       deltaMs,

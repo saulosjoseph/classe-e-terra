@@ -16,13 +16,58 @@ export class BootScene extends Phaser.Scene {
       frameWidth: 128,
       frameHeight: 128
     });
+    this.load.spritesheet('trabalhador_rural_a', 'assets/trabalhador_rural_a.png', {
+      frameWidth: 128,
+      frameHeight: 128
+    });
+    this.load.spritesheet('trabalhador_rural_b', 'assets/trabalhador_rural_b.png', {
+      frameWidth: 128,
+      frameHeight: 128
+    });
   }
 
   public create(): void {
     PixelArtGenerator.generateAll(this);
     this.createBrigadistaAnimations();
     this.createBrigadaComunitariaAnimations();
+    this.createTrabalhadorRuralAnimations();
     this.scene.start('MenuScene');
+  }
+
+  // Frames definidos em scripts/create_trabalhador_rural_spritesheet.js
+  private createTrabalhadorRuralAnimations(): void {
+    const variants = [
+      { key: 'trabalhador_rural_a', walk: [1, 2, 3, 4, 5], extinguish: [6, 7, 8] },
+      { key: 'trabalhador_rural_b', walk: [1, 2, 3], extinguish: [4, 5] }
+    ];
+
+    for (const variant of variants) {
+      const prefix = variant.key;
+      if (!this.anims.exists(`${prefix}_idle`)) {
+        this.anims.create({
+          key: `${prefix}_idle`,
+          frames: this.anims.generateFrameNumbers(variant.key, { frames: [0] }),
+          frameRate: 1,
+          repeat: -1
+        });
+      }
+      if (!this.anims.exists(`${prefix}_walk`)) {
+        this.anims.create({
+          key: `${prefix}_walk`,
+          frames: this.anims.generateFrameNumbers(variant.key, { frames: variant.walk }),
+          frameRate: 5,
+          repeat: -1
+        });
+      }
+      if (!this.anims.exists(`${prefix}_extinguish`)) {
+        this.anims.create({
+          key: `${prefix}_extinguish`,
+          frames: this.anims.generateFrameNumbers(variant.key, { frames: variant.extinguish }),
+          frameRate: 4,
+          repeat: -1
+        });
+      }
+    }
   }
 
   private createBrigadaComunitariaAnimations(): void {

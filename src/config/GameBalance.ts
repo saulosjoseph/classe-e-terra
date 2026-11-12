@@ -249,10 +249,19 @@ export const BALANCE = {
   /** Limite máximo de unidades aliadas para manter tela mobile limpa e fluida */
   MAX_BRIGADISTAS: 6,
   MAX_GUARDAS: 3,
+  /** Trabalhadores Rurais: quantidade acompanha os focos ativos, sem limite fixo */
+  TRABALHADOR_RURAL: {
+    MIN_COUNT: 2,
+    FIRES_PER_WORKER: 3,
+    SPEED: 40,
+    EXTINGUISH_POWER: 8,
+    STAMINA_DRAIN_PER_SEC: 1.5,
+    STAMINA_REGEN_PER_SEC: 1
+  },
   /** Doação de cada casa da cidade às brigadas voluntárias */
   HOUSE_DONATION: {
     COOLDOWN_MS: 120000,
     CONSCIOUSNESS_GAIN: 0.5,
-    BRIGADISTA_ENERGY_PERCENT: 5
+    BRIGADISTA_ENERGY_PERCENT: 25
   }
 };

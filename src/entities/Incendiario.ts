@@ -28,7 +28,8 @@ export class Incendiario extends Phaser.Events.EventEmitter {
   private targetY: number;
   private escapeX: number;
   private escapeY: number;
-  private speed = 64;
+  private speed = 100;
+  private escapeSpeed = 150;
   private hasIgnited = false;
   private igniteWarmupMs = 1500;
   private alive = true;
@@ -153,8 +154,8 @@ export class Incendiario extends Phaser.Events.EventEmitter {
         (this.escapeY - this.y) * ISO_INVERSE_Y_RATIO,
         this.escapeX - this.x
       );
-      this.x += Math.cos(groundAngle) * (this.speed * 1.18) * dtSec;
-      this.y += Math.sin(groundAngle) * (this.speed * 1.18) * dtSec * ISO_Y_RATIO;
+      this.x += Math.cos(groundAngle) * this.escapeSpeed * dtSec;
+      this.y += Math.sin(groundAngle) * this.escapeSpeed * dtSec * ISO_Y_RATIO;
       this.sprite.setFlipX(Math.cos(groundAngle) < 0);
     }
 

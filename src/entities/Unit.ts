@@ -102,6 +102,8 @@ export abstract class Unit extends Phaser.Events.EventEmitter {
         return 'Brigadista Comunitário';
       case UnitType.GUARDA_FLORESTAL:
         return 'Guarda Florestal';
+      case UnitType.TRABALHADOR_RURAL:
+        return 'Trabalhador Rural';
       default:
         return 'Unidade Popular';
     }
@@ -130,6 +132,10 @@ export abstract class Unit extends Phaser.Events.EventEmitter {
 
   public setStamina(value: number): void {
     this.stamina = Phaser.Math.Clamp(value, 0, this.maxStamina);
+  }
+
+  public getStaminaRatio(): number {
+    return this.stamina / this.maxStamina;
   }
 
   public boostStaminaPercent(percent: number): void {
