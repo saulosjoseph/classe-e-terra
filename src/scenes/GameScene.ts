@@ -986,20 +986,10 @@ export class GameScene extends Phaser.Scene {
     const arsonists = this.spawnerSystem.getArsonists();
     for (const arsonist of arsonists) {
       arsonist.update(deltaMs, this.fireSystem);
-
-      for (const brig of this.brigadistas) {
-        if (
-          arsonist.isAlive() &&
-          getIsoDistance(brig.x, brig.y, arsonist.x, arsonist.y) <= 32
-        ) {
-          this.captureArsonist(arsonist);
-          break;
-        }
-      }
     }
 
     for (const brig of this.brigadistas) {
-      brig.update(deltaMs, this.fireSystem, arsonists, this.boss);
+      brig.update(deltaMs, this.fireSystem, this.boss);
     }
 
     for (const guarda of this.guardas) {

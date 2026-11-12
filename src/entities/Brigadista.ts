@@ -10,13 +10,12 @@ import {
 import { ActiveFireInstance, FireSmokeSystem } from '../systems/FireSmokeSystem';
 import { SectorType, UnitType } from '../types/GameTypes';
 import { BossFortress } from './BossFortress';
-import { Incendiario } from './Incendiario';
 import { Unit } from './Unit';
 
 /**
  * Brigada Voluntária (Fase 1: isolada na Floresta, cansa rápido)
  * Evolui aos 20% de Consciência para Brigadista Comunitário (atua nos 3 setores).
- * Totalmente autônomo: busca focos de fogo, incendiários ou a Fortaleza do Burguês por conta própria!
+ * Totalmente autônomo: busca e extingue focos de fogo pelo mapa e cerca a Fortaleza do Burguês na Fase 6!
  */
 export class Brigadista extends Unit {
   private extinguishPower = 20;
@@ -89,7 +88,6 @@ export class Brigadista extends Unit {
   public update(
     deltaMs: number,
     fireSystem: FireSmokeSystem,
-    arsonists: Incendiario[],
     boss: BossFortress | null
   ): void {
     const dtSec = deltaMs / 1000;
@@ -127,41 +125,21 @@ export class Brigadista extends Unit {
         boss.x + Math.cos(angleOffset) * 36,
         boss.y + Math.sin(angleOffset) * (36 * ISO_Y_RATIO)
       );
-    } else {
-      // 3. Se não há fogo, verifica se há algum incendiário próximo para interceptar ou faz ronda preventiva
-      let closestArsonist: Incendiario | null = null;
-      let minArsonistDist = Infinity;
-      for (const a of arsonists) {
-        if (!a.isAlive()) continue;
-        const distCenter = getIsoDistance(a.x, a.y, WORLD_CENTER_X, WORLD_CENTER_Y);
-        if (this.unitType === UnitType.BRIGADA_VOLUNTARIA && distCenter < CAMPO_RADIUS) {
-          continue;
-        }
-        const d = getIsoDistance(this.x, this.y, a.x, a.y);
-        if (d < minArsonistDist) {
-          minArsonistDist = d;
-          closestArsonist = a;
-        }
-      }
-
-      if (closestArsonist) {
-        this.setCommandTarget(closestArsonist.x, closestArsonist.y);
-      } else if (!this.isMoving()) {
-        // Ronda circular automática pelo setor em elipse isométrica
-        this.patrolAngle += 0.55;
-        const patrolRadius =
-          this.unitType === UnitType.BRIGADA_VOLUNTARIA
-            ? (CAMPO_RADIUS + FLORESTA_OUTER_RADIUS) / 2
-            : this.unitIndex % 3 === 0
-              ? CAMPO_RADIUS + 110
-              : this.unitIndex % 3 === 1
-                ? CAMPO_RADIUS - 110
-                : 140;
-        this.setCommandTarget(
-          WORLD_CENTER_X + Math.cos(this.patrolAngle) * patrolRadius,
-          WORLD_CENTER_Y + Math.sin(this.patrolAngle) * (patrolRadius * ISO_Y_RATIO)
-        );
-      }
+    } else if (!this.isMoving()) {
+      // 3. Se não há fogo e o Burguês não está ativo, realiza ronda preventiva contínua pelo setor
+      this.patrolAngle += 0.55;
+      const patrolRadius =
+        this.unitType === UnitType.BRIGADA_VOLUNTARIA
+          ? (CAMPO_RADIUS + FLORESTA_OUTER_RADIUS) / 2
+          : this.unitIndex % 3 === 0
+            ? CAMPO_RADIUS + 110
+            : this.unitIndex % 3 === 1
+              ? CAMPO_RADIUS - 110
+              : 140;
+      this.setCommandTarget(
+        WORLD_CENTER_X + Math.cos(this.patrolAngle) * patrolRadius,
+        WORLD_CENTER_Y + Math.sin(this.patrolAngle) * (patrolRadius * ISO_Y_RATIO)
+      );
     }
 
     this.moveStep(deltaMs, smokeAtPos);
