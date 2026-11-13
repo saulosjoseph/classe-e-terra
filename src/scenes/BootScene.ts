@@ -11,6 +11,11 @@ export class BootScene extends Phaser.Scene {
     this.load.image('base_brigadista_voluntario', 'assets/base_brigadista_voluntario.png');
     this.load.image('aldeia', 'assets/aldeia.png');
     this.load.image('base_bombeiros', 'assets/base_bombeiros.png');
+    this.load.image('caminhao_bombeiros', 'assets/caminhao_bombeiros.png');
+    this.load.spritesheet('bombeiro_spray', 'assets/bombeiro_spray.png', {
+      frameWidth: 128,
+      frameHeight: 128
+    });
     this.load.spritesheet('brigadista_voluntario', 'assets/brigadista_voluntario.png', {
       frameWidth: 128,
       frameHeight: 128
@@ -168,6 +173,15 @@ export class BootScene extends Phaser.Scene {
           frames: [7, 8, 9, 10, 11]
         }),
         frameRate: 7,
+        repeat: -1
+      });
+    }
+
+    if (!this.anims.exists('bombeiro_spray')) {
+      this.anims.create({
+        key: 'bombeiro_spray',
+        frames: this.anims.generateFrameNumbers('bombeiro_spray', { frames: [0, 1, 2] }),
+        frameRate: 8,
         repeat: -1
       });
     }

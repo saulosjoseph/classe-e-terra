@@ -102,6 +102,8 @@ export abstract class Unit extends Phaser.Events.EventEmitter {
         return 'Brigadista Voluntário';
       case UnitType.BRIGADISTA_COMUNITARIO:
         return 'Brigadista Comunitário';
+      case UnitType.BOMBEIRO:
+        return 'Bombeiro';
       case UnitType.GUARDA_FLORESTAL:
         return 'Guarda Florestal';
       case UnitType.TRABALHADOR_RURAL:

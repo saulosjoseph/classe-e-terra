@@ -34,6 +34,7 @@ import {
 import { SoundManager } from '../audio/SoundManager';
 import { BossFortress } from '../entities/BossFortress';
 import { Brigadista } from '../entities/Brigadista';
+import { Bombeiro } from '../entities/Bombeiro';
 import { CarroPopular } from '../entities/CarroPopular';
 import { GuardaFlorestal } from '../entities/GuardaFlorestal';
 import { Incendiario } from '../entities/Incendiario';
@@ -89,6 +90,8 @@ interface ForestTree {
 
 /** Ponto onde os brigadistas nascem junto à Base dos Brigadistas (deslocamento em relação ao centro da base) */
 const BRIGADISTA_BASE_SPAWN_OFFSET = { x: -150, y: 120 };
+/** Ponto onde o caminhão dos bombeiros nasce, perto da Base dos Bombeiros (dentro do raio de recarga) */
+const BOMBEIRO_BASE_SPAWN_OFFSET = { x: 40, y: 60 };
 
 export class GameScene extends Phaser.Scene {
   public difficulty!: DifficultyConfig;
@@ -104,11 +107,13 @@ export class GameScene extends Phaser.Scene {
 
   private forestHealth = BALANCE.INITIAL_FOREST_HEALTH;
   private brigadistas: Brigadista[] = [];
+  private bombeiros: Bombeiro[] = [];
   private guardas: GuardaFlorestal[] = [];
   private trabalhadoresRurais: TrabalhadorRural[] = [];
   private nextUnitId = 1;
 
   private brigadistaBaseReadyAt = 0;
+  private bombeiroBaseReadyAt = 0;
   private spawnGuardaReadyAt = 0;
   private indigenousShieldGraphics!: Phaser.GameObjects.Graphics;
 
@@ -177,12 +182,12 @@ export class GameScene extends Phaser.Scene {
     this.difficulty = DIFFICULTY_CONFIGS[diffLevel];
     this.forestHealth = BALANCE.INITIAL_FOREST_HEALTH;
     this.brigadistas = [];
-    this.carrosDoacao = [];
+    this.bombeiros = [];
     this.guardas = [];
     this.trabalhadoresRurais = [];
     this.nextUnitId = 1;
     this.brigadistaBaseReadyAt = 0;
-    this.spawnGuardaReadyAt = 0;
+    this.bombeiroBaseReadyAt = 0;
     this.firesExtinguished = 0;
     this.arsonistsCaptured = 0;
     this.integratedActionsUsed = 0;
@@ -260,6 +265,14 @@ export class GameScene extends Phaser.Scene {
       const worker = this.spawnTrabalhadorRuralUnit(northSpots[i].x, northSpots[i].y, variant);
       worker.update(0, this.fireSystem);
     });
+
+    // 1 Bombeiro já na Base dos Bombeiros, sem gastar o cooldown de formação
+    const bombeiro = this.spawnBombeiroUnit(
+      BASE_BOMBEIROS_X + BOMBEIRO_BASE_SPAWN_OFFSET.x,
+      BASE_BOMBEIROS_Y + BOMBEIRO_BASE_SPAWN_OFFSET.y,
+      false
+    );
+    bombeiro?.update(0, this.fireSystem, this.boss);
 
     // Inicia a câmera posicionada no Campo (Anel Médio), enquadrando Floresta, Campo e Cidade conforme imagem de referência
     this.centerCameraOnPoint(1864, 3994.5, false);
@@ -1416,6 +1429,48 @@ export class GameScene extends Phaser.Scene {
     this.events.emit('aldeia-clicked');
   }
 
+  public getBombeiroCount(): number {
+    return this.bombeiros.length;
+  }
+
+  /** Durante o Ajuste Fiscal, a Base dos Bombeiros forma no máximo 1 bombeiro (com seu caminhão) */
+  public getBombeiroLimit(): number {
+    return this.phaseSystem.isAjusteFiscalActive()
+      ? BALANCE.BOMBEIROS_BASE_MAX_AJUSTE_FISCAL
+      : BALANCE.MAX_BOMBEIROS;
+  }
+
+  public getBombeiroBaseCooldownRemainingMs(): number {
+    return Math.max(0, this.bombeiroBaseReadyAt - this.time.now);
+  }
+
+  public tryRecruitBombeiro(): boolean {
+    if (this.bombeiros.length >= this.getBombeiroLimit()) return false;
+    if (this.getBombeiroBaseCooldownRemainingMs() > 0) return false;
+
+    const spawnX = BASE_BOMBEIROS_X + BOMBEIRO_BASE_SPAWN_OFFSET.x;
+    const spawnY = BASE_BOMBEIROS_Y + BOMBEIRO_BASE_SPAWN_OFFSET.y;
+    const unit = this.spawnBombeiroUnit(spawnX, spawnY, true);
+    if (!unit) return false;
+
+    this.bombeiroBaseReadyAt = this.time.now + BALANCE.COOLDOWNS.SPAWN_BOMBEIRO_BASE;
+    SoundManager.playSelect();
+    return true;
+  }
+
+  public spawnBombeiroUnit(x: number, y: number, focusCamera = true): Bombeiro | null {
+    if (this.bombeiros.length >= this.getBombeiroLimit()) return null;
+    const unit = new Bombeiro(this, `bombeiro_${this.nextUnitId++}`, x, y);
+    this.bombeiros.push(unit);
+    unit.on('unit-tapped', (clicked: Unit) => {
+      this.followEntity(clicked);
+    });
+    if (focusCamera) {
+      this.centerCameraOnPoint(x, y, true);
+    }
+    return unit;
+  }
+
   public getBrigadistaLimit(): number {
     return this.phaseSystem.isAjusteFiscalActive()
       ? BALANCE.BRIGADISTA_BASE_MAX_AJUSTE_FISCAL
@@ -1467,7 +1522,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   public getAllUnits(): Unit[] {
-    return [...this.brigadistas, ...this.guardas, ...this.trabalhadoresRurais];
+    return [...this.brigadistas, ...this.bombeiros, ...this.guardas, ...this.trabalhadoresRurais];
   }
 
   public getForestHealth(): number {
@@ -1600,6 +1655,9 @@ export class GameScene extends Phaser.Scene {
 
     for (const brig of this.brigadistas) {
       brig.update(deltaMs, this.fireSystem, this.boss);
+    }
+    for (const bombeiro of this.bombeiros) {
+      bombeiro.update(deltaMs, this.fireSystem, this.boss);
     }
     this.updateBrigadistaSpeechBubble();
 

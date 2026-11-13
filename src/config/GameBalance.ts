@@ -292,6 +292,7 @@ export const BALANCE = {
     LOCAL_CAMPO_ACEIRO: 9500,
     LOCAL_FLORESTA_REFLORESTAR: 10000,
     SPAWN_BRIGADISTA_BASE: 120000,
+    SPAWN_BOMBEIRO_BASE: 120000,
     SPAWN_GUARDA: 14000
   },
   /** Penalidade do Ajuste Fiscal nas ações da Cidade durante Fases 1 e 2 */
@@ -303,6 +304,15 @@ export const BALANCE = {
   /** Enquanto o Ajuste Fiscal estiver ativo, a Base dos Brigadistas forma até este total */
   BRIGADISTA_BASE_MAX_AJUSTE_FISCAL: 3,
   MAX_GUARDAS: 3,
+  /** Bombeiros (cada um com seu caminhão): limite normal e durante o Ajuste Fiscal */
+  MAX_BOMBEIROS: 4,
+  BOMBEIROS_BASE_MAX_AJUSTE_FISCAL: 1,
+  BOMBEIRO: {
+    SPEED: 170,
+    EXTINGUISH_POWER: 26,
+    /** Energia consumida por segundo enquanto o bombeiro está fora da base */
+    STAMINA_DRAIN_PER_SEC: 2
+  },
   /** Trabalhadores Rurais: quantidade acompanha os focos ativos, sem limite fixo */
   TRABALHADOR_RURAL: {
     MIN_COUNT: 2,

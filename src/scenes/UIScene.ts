@@ -94,7 +94,7 @@ export class UIScene extends Phaser.Scene {
     this.gameScene.events.on('house-clicked', this.showHouseDonationPanel, this);
     this.gameScene.events.on('brigadista-base-clicked', this.showBrigadistaBaseModal, this);
     this.gameScene.events.on('aldeia-clicked', this.showAldeiaInfoModal, this);
-    this.gameScene.events.on('bombeiros-base-clicked', this.showBombeirosBaseInfoModal, this);
+    this.gameScene.events.on('bombeiros-base-clicked', this.showBombeirosBaseModal, this);
     this.events.once('shutdown', () => {
       this.gameScene.events.off('show-donation-info', this.showDonationInfoModal, this);
       this.gameScene.events.off('show-trabalhador-info', this.showTrabalhadorInfoModal, this);
@@ -102,7 +102,7 @@ export class UIScene extends Phaser.Scene {
       this.gameScene.events.off('house-clicked', this.showHouseDonationPanel, this);
       this.gameScene.events.off('brigadista-base-clicked', this.showBrigadistaBaseModal, this);
       this.gameScene.events.off('aldeia-clicked', this.showAldeiaInfoModal, this);
-      this.gameScene.events.off('bombeiros-base-clicked', this.showBombeirosBaseInfoModal, this);
+      this.gameScene.events.off('bombeiros-base-clicked', this.showBombeirosBaseModal, this);
     });
 
     this.gameScene.phaseSystem.on(
@@ -916,11 +916,144 @@ export class UIScene extends Phaser.Scene {
     );
   }
 
-  public showBombeirosBaseInfoModal(): void {
-    this.openInfoModal(
-      'Base dos Bombeiros',
-      'Os bombeiros ficam na borda da cidade, de olho na floresta. Quando o fogo se aproxima, a equipe precisa de estrutura, treinamento e apoio para agir rápido.'
-    );
+  public showBombeirosBaseModal(): void {
+    if (!this.gameScene) return;
+    this.gameScene.isStoryModalOpen = true;
+
+    const modalContainer = this.add.container(0, 0).setDepth(201);
+
+    const backdrop = this.add
+      .rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.82)
+      .setInteractive();
+
+    const boxW = 630;
+    const boxH = 240;
+    const boxX = GAME_WIDTH / 2;
+    const boxY = GAME_HEIGHT / 2;
+
+    const boxBg = this.add
+      .rectangle(boxX, boxY, boxW, boxH, 0x090d0a, 0.98)
+      .setStrokeStyle(2.5, 0xfacc15);
+
+    const innerBorder = this.add
+      .rectangle(boxX, boxY, boxW - 10, boxH - 10, 0x000000, 0)
+      .setStrokeStyle(1, 0x15803d);
+
+    const title = this.add
+      .text(boxX, boxY - boxH / 2 + 28, 'BASE DOS BOMBEIROS', {
+        fontSize: '13px',
+        fontStyle: 'bold',
+        color: '#fde047'
+      })
+      .setOrigin(0.5);
+
+    const count = this.gameScene.getBombeiroCount();
+    const limit = this.gameScene.getBombeiroLimit();
+    const limitReached = count >= limit;
+    const remainingMs = this.gameScene.getBombeiroBaseCooldownRemainingMs();
+    const onCooldown = remainingMs > 0;
+
+    const infoText = this.add
+      .text(
+        boxX,
+        boxY - 40,
+        this.gameScene.phaseSystem.isAjusteFiscalActive()
+          ? 'Durante o Ajuste Fiscal, a base forma no máximo 1 bombeiro, com seu caminhão. Ele perde energia fora da base e volta para recarregar.'
+          : 'A base forma um novo bombeiro a cada 2 minutos, até o limite de bombeiros. Cada bombeiro vem com seu caminhão e perde energia fora da base.',
+        {
+          fontSize: '12px',
+          color: '#f4f4f5',
+          align: 'center',
+          lineSpacing: 5,
+          wordWrap: { width: boxW - 60 }
+        }
+      )
+      .setOrigin(0.5);
+
+    const countText = this.add
+      .text(boxX, boxY + 4, `Bombeiros: ${count}/${limit}`, {
+        fontSize: '12px',
+        fontStyle: 'bold',
+        color: '#f4f4f5'
+      })
+      .setOrigin(0.5);
+
+    let statusLabel: string;
+    if (limitReached) {
+      statusLabel = 'Limite de bombeiros atingido';
+    } else if (onCooldown) {
+      const remainingSec = Math.ceil(remainingMs / 1000);
+      statusLabel = `Próximo bombeiro em ${Math.floor(remainingSec / 60)}:${String(remainingSec % 60).padStart(2, '0')}`;
+    } else {
+      statusLabel = 'Pronto para formar um bombeiro';
+    }
+    const canRecruit = !limitReached && !onCooldown;
+
+    const statusText = this.add
+      .text(boxX, boxY + 26, statusLabel, {
+        fontSize: '11px',
+        fontStyle: 'bold',
+        color: canRecruit ? '#86efac' : '#fca5a5'
+      })
+      .setOrigin(0.5);
+
+    const btnY = boxY + boxH / 2 - 32;
+
+    const recruitBtn = this.add
+      .rectangle(boxX - 110, btnY, 260, 38, canRecruit ? 0x9a3412 : 0x3f3f46, 1)
+      .setStrokeStyle(2, canRecruit ? 0xfdba74 : 0x71717a);
+    if (canRecruit) recruitBtn.setInteractive({ useHandCursor: true });
+
+    const recruitText = this.add
+      .text(boxX - 110, btnY, '🚒 Formar bombeiro', {
+        fontSize: '12px',
+        fontStyle: 'bold',
+        color: canRecruit ? '#fff7ed' : '#a1a1aa'
+      })
+      .setOrigin(0.5);
+
+    const closeBtn = this.add
+      .rectangle(boxX + 150, btnY, 120, 38, 0x27272a, 1)
+      .setStrokeStyle(2, 0x71717a)
+      .setInteractive({ useHandCursor: true });
+
+    const closeText = this.add
+      .text(boxX + 150, btnY, 'Fechar', {
+        fontSize: '12px',
+        fontStyle: 'bold',
+        color: '#f4f4f5'
+      })
+      .setOrigin(0.5);
+
+    const closeModal = () => {
+      SoundManager.unlock();
+      if (this.gameScene) {
+        this.gameScene.isStoryModalOpen = false;
+      }
+      modalContainer.destroy();
+    };
+
+    recruitBtn.on('pointerup', () => {
+      if (this.gameScene.tryRecruitBombeiro()) {
+        closeModal();
+      }
+    });
+    closeBtn.on('pointerup', closeModal);
+    backdrop.on('pointerup', closeModal);
+
+    modalContainer.add([
+      backdrop,
+      boxBg,
+      innerBorder,
+      title,
+      infoText,
+      countText,
+      statusText,
+      recruitBtn,
+      recruitText,
+      closeBtn,
+      closeText
+    ]);
   }
 
   private openInfoModal(headerText: string, infoText: string): void {
