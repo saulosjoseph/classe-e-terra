@@ -21,7 +21,6 @@ export class Incendiario extends Phaser.Events.EventEmitter {
   public sprite: Phaser.GameObjects.Sprite;
   public shadowSprite: Phaser.GameObjects.Sprite;
   public selectionRing: Phaser.GameObjects.Graphics;
-  public alertBadge: Phaser.GameObjects.Text;
   public hitZone: Phaser.GameObjects.Zone;
 
   private scene: Phaser.Scene;
@@ -68,20 +67,10 @@ export class Incendiario extends Phaser.Events.EventEmitter {
     this.selectionRing = scene.add.graphics().setDepth(19);
 
     this.sprite = scene.add
-      .sprite(spawnX, spawnY, 'enemy_incendiario')
+      .sprite(spawnX, spawnY, 'incendiario', 0)
       .setOrigin(0.5, 0.88)
+      .setScale(0.75)
       .setDepth(20 + Math.floor(spawnY));
-
-    this.alertBadge = scene.add
-      .text(spawnX, spawnY - 26, '!', {
-        fontSize: '13px',
-        fontStyle: 'bold',
-        color: '#fef08a',
-        backgroundColor: '#dc2626',
-        padding: { x: 3, y: 1 }
-      })
-      .setOrigin(0.5)
-      .setDepth(30 + Math.floor(spawnY));
 
     this.hitZone = scene.add
       .zone(spawnX, spawnY, 54, 54)
@@ -141,6 +130,7 @@ export class Incendiario extends Phaser.Events.EventEmitter {
     if (Math.abs(this.x - prevX) > 0.05) {
       this.sprite.setFlipX(this.x < prevX);
     }
+    this.sprite.play('incendiario_walk', true);
   }
 
   public update(deltaMs: number, fireSystem: FireSmokeSystem): void {
@@ -153,12 +143,11 @@ export class Incendiario extends Phaser.Events.EventEmitter {
         this.advance(this.targetX, this.targetY, this.speed * dtSec);
       } else {
         // Ateando fogo no ponto cego
+        this.sprite.play('incendiario_idle', true);
         this.igniteWarmupMs -= deltaMs;
-        this.alertBadge.setText('🔥');
         if (this.igniteWarmupMs <= 0) {
           this.hasIgnited = true;
           fireSystem.spawnFire(this.x, this.y, 24);
-          this.alertBadge.setText('➔');
         }
       }
     } else {
@@ -174,7 +163,6 @@ export class Incendiario extends Phaser.Events.EventEmitter {
     const yDepth = 20 + Math.floor(this.y);
     this.sprite.setPosition(this.x, this.y).setDepth(yDepth);
     this.shadowSprite.setPosition(this.x, this.y);
-    this.alertBadge.setPosition(this.x, this.y - 28).setDepth(yDepth + 1);
     this.hitZone.setPosition(this.x, this.y);
     this.drawOverlays();
   }
@@ -182,7 +170,6 @@ export class Incendiario extends Phaser.Events.EventEmitter {
   public destroy(): void {
     this.sprite.destroy();
     this.shadowSprite.destroy();
-    this.alertBadge.destroy();
     this.hitZone.destroy();
   }
 }

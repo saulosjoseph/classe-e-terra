@@ -26,6 +26,10 @@ export class BootScene extends Phaser.Scene {
       frameWidth: 128,
       frameHeight: 128
     });
+    this.load.spritesheet('incendiario', 'assets/incendiario.png', {
+      frameWidth: 128,
+      frameHeight: 128
+    });
     this.load.image('carro_popular_vermelho', 'assets/carro_popular_vermelho.png');
     this.load.image('carro_popular_amarelo', 'assets/carro_popular_amarelo.png');
     this.load.image('carro_popular_preto', 'assets/carro_popular_preto.png');
@@ -37,7 +41,28 @@ export class BootScene extends Phaser.Scene {
     this.createBrigadistaAnimations();
     this.createBrigadaComunitariaAnimations();
     this.createTrabalhadorRuralAnimations();
+    this.createIncendiarioAnimations();
     this.scene.start('MenuScene');
+  }
+
+  // Frames definidos em scripts/create_incendiario_spritesheet.js
+  private createIncendiarioAnimations(): void {
+    if (!this.anims.exists('incendiario_idle')) {
+      this.anims.create({
+        key: 'incendiario_idle',
+        frames: this.anims.generateFrameNumbers('incendiario', { frames: [0] }),
+        frameRate: 1,
+        repeat: -1
+      });
+    }
+    if (!this.anims.exists('incendiario_walk')) {
+      this.anims.create({
+        key: 'incendiario_walk',
+        frames: this.anims.generateFrameNumbers('incendiario', { frames: [1, 2, 3, 4, 5] }),
+        frameRate: 7,
+        repeat: -1
+      });
+    }
   }
 
   // Frames definidos em scripts/create_trabalhador_rural_spritesheet.js

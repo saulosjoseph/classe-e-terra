@@ -11,7 +11,6 @@ export class PixelArtGenerator {
     this.generateHDShadow(scene);
     this.generateHDVoluntario(scene);
     this.generateHDGuarda(scene);
-    this.generateHDIncendiario(scene);
     this.generateHDFire(scene);
     this.generateHDSmoke(scene);
     this.generateHDTree(scene);
@@ -215,53 +214,6 @@ export class PixelArtGenerator {
     this.line(ctx, 19, 42, 25, 42, '#27272a');
 
     this.finalizeCanvas(scene, 'unit_guarda');
-  }
-
-  // 4. Incendiário / Grileiro HD (36x44: capuz, jaqueta tática puída, tocha acesa ardente e galão de combustível)
-  private static generateHDIncendiario(scene: Phaser.Scene): void {
-    const ctx = this.initCanvas(scene, 'enemy_incendiario', 36, 44);
-    if (!ctx) return;
-
-    // Capuz e balaclava escura cobrindo a cabeça
-    this.rect(ctx, 11, 4, 14, 4, '#18181b');
-    this.rect(ctx, 9, 8, 18, 5, '#27272a');
-    this.rect(ctx, 13, 13, 10, 4, '#18181b');
-    this.px(ctx, 15, 14, '#ef4444');
-    this.px(ctx, 19, 14, '#ef4444');
-    this.rect(ctx, 12, 17, 12, 4, '#09090b');
-
-    // Tronco: Jaqueta escura rasgada
-    this.rect(ctx, 11, 21, 14, 11, '#27272a');
-    this.rect(ctx, 12, 22, 12, 9, '#3f3f46');
-    this.line(ctx, 14, 25, 16, 28, '#18181b');
-
-    // Braço direito erguendo a tocha acesa
-    this.line(ctx, 25, 22, 29, 18, '#27272a');
-    this.rect(ctx, 28, 17, 3, 3, '#18181b');
-    this.line(ctx, 29, 19, 31, 11, '#78350f');
-    this.line(ctx, 30, 19, 32, 11, '#451a03');
-    this.rect(ctx, 30, 9, 4, 3, '#18181b');
-    this.poly(ctx, [[28, 9], [32, 1], [35, 7], [32, 9]], '#ea580c');
-    this.poly(ctx, [[29, 8], [32, 3], [34, 7]], '#facc15');
-    this.px(ctx, 31, 0, '#ef4444');
-    this.px(ctx, 34, 3, '#fef08a');
-    this.px(ctx, 28, 4, '#ea580c');
-
-    // Braço esquerdo segurando o galão de combustível vermelho
-    this.line(ctx, 10, 22, 6, 27, '#27272a');
-    this.rect(ctx, 5, 27, 3, 3, '#18181b');
-    this.rect(ctx, 2, 29, 7, 9, '#dc2626');
-    this.rect(ctx, 3, 30, 5, 7, '#b91c1c');
-    this.line(ctx, 3, 28, 7, 28, '#facc15');
-
-    // Calça preta militar e botas pesadas
-    this.rect(ctx, 12, 32, 12, 2, '#09090b');
-    this.rect(ctx, 12, 34, 5, 6, '#18181b');
-    this.rect(ctx, 19, 34, 5, 6, '#27272a');
-    this.rect(ctx, 11, 40, 6, 3, '#09090b');
-    this.rect(ctx, 19, 40, 6, 3, '#09090b');
-
-    this.finalizeCanvas(scene, 'enemy_incendiario');
   }
 
   // 5. Foco de Fogo HD (36x36: lenha em brasa no solo, labaredas fluidas e faíscas incandescentes)
