@@ -275,7 +275,7 @@ export const POLITICAL_PHASES: PoliticalPhaseDefinition[] = [
 ];
 
 export const BALANCE = {
-  INITIAL_FOREST_HEALTH: 2000,
+  INITIAL_FOREST_HEALTH: 10000,
   INITIAL_CONSCIOUSNESS: 0,
   MAX_CONSCIOUSNESS: 100,
   /** Cooldowns base em milissegundos */
