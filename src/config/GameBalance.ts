@@ -23,23 +23,54 @@ export const MAP_TOP_Y = HUD_TOP_HEIGHT;
 export const MAP_BOTTOM_Y = GAME_HEIGHT - HUD_BOTTOM_HEIGHT; // 323
 export const MAP_VIEWPORT_HEIGHT = MAP_BOTTOM_Y - MAP_TOP_Y; // 269
 
-export const WORLD_WIDTH = 8000;
+export const WORLD_WIDTH = 10400;
 export const WORLD_HEIGHT = 8000;
-export const WORLD_CENTER_X = WORLD_WIDTH / 2; // 4000
+export const WORLD_CENTER_X = WORLD_WIDTH / 2; // 5200
 export const WORLD_CENTER_Y = WORLD_HEIGHT / 2; // 4000
 
 /** Proporção dimétrica 2:1 da Visão Isométrica clássica (RTS / Pixel Art) */
 export const ISO_Y_RATIO = 0.5;
 export const ISO_INVERSE_Y_RATIO = 2.0;
 
-/** Cidade quadruplicada em tamanho (raio de 1840px / diâmetro de 3680x1840px) */
-export const CITY_RADIUS = 1840;
+/** Cidade quadruplicada em tamanho (raio de 1960px: malha viária de 1920px + margem) */
+export const CITY_RADIUS = 1960;
 export const CAMPO_RADIUS = 2800;
-export const FLORESTA_OUTER_RADIUS = 3800;
+export const FLORESTA_OUTER_RADIUS = 5000;
+
+/**
+ * Colisão no solo: célula da grade de navegação e raios (no plano do solo) dos obstáculos fixos.
+ * AGENT_CLEARANCE é a folga que cada personagem/carro mantém de qualquer obstáculo.
+ */
+export const COLLISION = {
+  CELL_SIZE: 10,
+  AGENT_CLEARANCE: 10,
+  HOUSE_RADIUS: 24,
+  PREFEITURA_RADIUS: 75,
+  TREE_RADIUS: 27,
+  FARM_RADIUS: 12,
+  BASE_BRIGADISTA_RADIUS: 110
+} as const;
+
+/**
+ * Fogo nas árvores da floresta: uma árvore saudável pega fogo quando está a até IGNITION_RADIUS
+ * (distância isométrica, 3 tiles de 64 px) de um foco ativo. A chance por verificação escala com a intensidade do foco.
+ * Depois de queimar, a árvore fica carbonizada e continua bloqueando a passagem.
+ */
+export const TREE_FIRE = {
+  IGNITION_RADIUS: 192,
+  CHECK_INTERVAL_MS: 500,
+  IGNITION_CHANCE_PER_CHECK: 0.35,
+  BURN_DURATION_MS: 8000,
+  INITIAL_INTENSITY: 22
+} as const;
 
 export const CITY_RADIUS_Y = CITY_RADIUS * ISO_Y_RATIO; // 920
 export const CAMPO_RADIUS_Y = CAMPO_RADIUS * ISO_Y_RATIO; // 1400
 export const FLORESTA_OUTER_RADIUS_Y = FLORESTA_OUTER_RADIUS * ISO_Y_RATIO; // 1900
+
+/** Sede dos Brigadistas Voluntários, no anel da Floresta (noroeste) */
+export const BASE_BRIGADISTA_X = WORLD_CENTER_X - 2200;
+export const BASE_BRIGADISTA_Y = WORLD_CENTER_Y - 600;
 
 export const SECTOR_INFO: Record<
   SectorType,
@@ -228,7 +259,7 @@ export const POLITICAL_PHASES: PoliticalPhaseDefinition[] = [
 ];
 
 export const BALANCE = {
-  INITIAL_FOREST_HEALTH: 100,
+  INITIAL_FOREST_HEALTH: 500,
   INITIAL_CONSCIOUSNESS: 0,
   MAX_CONSCIOUSNESS: 100,
   /** Cooldowns base em milissegundos */
@@ -239,7 +270,7 @@ export const BALANCE = {
     LOCAL_CIDADE_EXAUSTAO: 9000,
     LOCAL_CAMPO_ACEIRO: 9500,
     LOCAL_FLORESTA_REFLORESTAR: 10000,
-    SPAWN_BRIGADISTA: 11000,
+    SPAWN_BRIGADISTA_BASE: 120000,
     SPAWN_GUARDA: 14000
   },
   /** Penalidade do Ajuste Fiscal nas ações da Cidade durante Fases 1 e 2 */
@@ -248,6 +279,8 @@ export const BALANCE = {
   SMOKE_COOLDOWN_MULT: 2.0,
   /** Limite máximo de unidades aliadas para manter tela mobile limpa e fluida */
   MAX_BRIGADISTAS: 6,
+  /** Enquanto o Ajuste Fiscal estiver ativo, a Base dos Brigadistas forma até este total */
+  BRIGADISTA_BASE_MAX_AJUSTE_FISCAL: 3,
   MAX_GUARDAS: 3,
   /** Trabalhadores Rurais: quantidade acompanha os focos ativos, sem limite fixo */
   TRABALHADOR_RURAL: {

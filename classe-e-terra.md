@@ -35,7 +35,7 @@ O avanço da Consciência Coletiva faz nascer unidades móveis que interagem dir
 ### 🧯 O Brigadista Comunitário (A Força Coletiva)
 * **Estado Inicial:** Começa o jogo apenas como uma única e fragilizada **Brigada Voluntária** restrita à Floresta, com poucos equipamentos e cansando rápido.
 * **Evolução (Aos 20% de Consciência):** Com a integração inicial entre Cidade (equipamentos) e Campo (alimentação), ela evolui para **Brigada Comunitária**.
-* **Impacto no Jogo:** Multiplica-se. O jogador passa a poder invocar e posicionar esquadrões de brigadistas em **qualquer um dos três setores** (Cidade, Campo e Floresta), formando uma rede coordenada de apagamento rápido de incêndios.
+* **Impacto no Jogo:** Multiplica-se. O jogador pode formar brigadistas tocando na **Base dos Brigadistas** (Floresta, noroeste), que abre um aviso com o botão "Formar brigadista". Essa formação não depende de Consciência Coletiva. Cada base forma um novo brigadista a cada 2 minutos, e ele nasce junto à própria base. Durante o Ajuste Fiscal, o brigadista formado é um **Brigadista Voluntário** (restrito aos focos da Floresta) e a base tem no máximo 3 brigadistas; após o Ajuste Fiscal, o brigadista formado é comunitário e o limite volta a 6. Os esquadrões se espalham pelos três setores (Cidade, Campo e Floresta), formando uma rede coordenada de apagamento rápido de incêndios.
 
 ### 🎯 O Guarda Florestal Comunitário Armado (A Autodefesa)
 * **Desbloqueio:** Aos 50% de Consciência (após derrubar o Ajuste Fiscal).
@@ -61,6 +61,8 @@ Para evoluir a barra de **Consciência Coletiva (0% a 100%)**, o jogador precisa
 * **Campo ➔ Cidade:** Envio de alimentos para zerar o estresse urbano (Gera +5% de Consciência).
 * **Floresta ➔ Campo:** Proteção das nascentes (Gera +5% de Consciência).
 * **Captura ➔ Cidade:** Expor os incendiários capturados (Gera +10% de Consciência imediata).
+
+*Representação visual da doação:* ao enviar uma doação de casa, um **carro popular** (em uma das cores vermelho, amarelo, preto ou prata, sorteada) sai da casa, leva a doação até o brigadista mais próximo e volta para a mesma casa. É apenas uma animação; o efeito (Consciência e energia) é imediato.
 
 ## 6. Faseamento Político e Progressão
 

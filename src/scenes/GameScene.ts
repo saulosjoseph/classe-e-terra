@@ -1,12 +1,16 @@
 import Phaser from 'phaser';
 import {
   BALANCE,
+  BASE_BRIGADISTA_X,
+  BASE_BRIGADISTA_Y,
   CAMPO_RADIUS,
   CAMPO_RADIUS_Y,
   CITY_RADIUS,
   CITY_RADIUS_Y,
+  COLLISION,
   DIFFICULTY_CONFIGS,
   FLORESTA_OUTER_RADIUS,
+  TREE_FIRE,
   FLORESTA_OUTER_RADIUS_Y,
   GAME_WIDTH,
   ISO_INVERSE_Y_RATIO,
@@ -26,10 +30,12 @@ import {
 import { SoundManager } from '../audio/SoundManager';
 import { BossFortress } from '../entities/BossFortress';
 import { Brigadista } from '../entities/Brigadista';
+import { CarroPopular } from '../entities/CarroPopular';
 import { GuardaFlorestal } from '../entities/GuardaFlorestal';
 import { Incendiario } from '../entities/Incendiario';
 import { TrabalhadorRural, TrabalhadorRuralVariant } from '../entities/TrabalhadorRural';
 import { Unit } from '../entities/Unit';
+import { CollisionSystem, getCollisionSystem, registerCollisionSystem } from '../systems/CollisionSystem';
 import { ActiveFireInstance, FireSmokeSystem } from '../systems/FireSmokeSystem';
 import { PoliticalPhaseSystem } from '../systems/PoliticalPhaseSystem';
 import { SectorSystem } from '../systems/SectorSystem';
@@ -59,21 +65,33 @@ export interface FollowableTarget {
 interface CityHouse {
   id: number;
   sprite: Phaser.GameObjects.Sprite;
+  obstacleId: string;
   /** Instante (tempo de jogo, em ms) em que a casa pode doar novamente */
   readyAt: number;
 }
 
-const BRIGADISTA_INTRO_DELAY_MS = 3000;
-const BRIGADISTA_INTRO_STAMINA = 6;
-const BRIGADISTA_INTRO_TEXT =
+const BRIGADISTA_EXAUSTO_TEXT =
   'Estou exausto, preciso de um açaí para continuar protegendo nosso território!';
 const TRABALHADOR_INTRO_TEXT =
   'Os trabalhadores estão combatendo o fogo sem equipamentos e sem treinamento, correndo risco de vida!';
+
+interface ForestTree {
+  x: number;
+  y: number;
+  sprite: Phaser.GameObjects.Sprite;
+  state: 'healthy' | 'burning' | 'burned';
+  burnLeftMs: number;
+}
+
+/** Ponto onde os brigadistas nascem junto à Base dos Brigadistas (deslocamento em relação ao centro da base) */
+const BRIGADISTA_BASE_SPAWN_OFFSET = { x: -150, y: 120 };
 
 export class GameScene extends Phaser.Scene {
   public difficulty!: DifficultyConfig;
   public phaseSystem!: PoliticalPhaseSystem;
   public fireSystem!: FireSmokeSystem;
+  private forestTrees: ForestTree[] = [];
+  private treeFireTimer = 0;
   public sectorSystem!: SectorSystem;
   public spawnerSystem!: SpawnerSystem;
   public boss!: BossFortress;
@@ -86,7 +104,7 @@ export class GameScene extends Phaser.Scene {
   private trabalhadoresRurais: TrabalhadorRural[] = [];
   private nextUnitId = 1;
 
-  private spawnBrigadistaReadyAt = 0;
+  private brigadistaBaseReadyAt = 0;
   private spawnGuardaReadyAt = 0;
   private indigenousShieldGraphics!: Phaser.GameObjects.Graphics;
 
@@ -126,9 +144,10 @@ export class GameScene extends Phaser.Scene {
   private isEnding = false;
   public isStoryModalOpen = true;
 
-  // Introdução: foco no Brigadista Voluntário e fala após o modal de contexto
+  // Introdução: foco no Brigadista Voluntário no início da partida
   private introStarted = false;
-  private introBrigadista: Brigadista | null = null;
+  // Brigadista exibindo a fala de exaustão (balão ancorado sobre ele)
+  private speakingBrigadista: Brigadista | null = null;
   private brigadistaSpeechBubble: SpeechBubble | null = null;
 
   // Após a primeira doação: foco em um Trabalhador Rural e fala sobre o risco de combate sem equipamentos
@@ -138,6 +157,7 @@ export class GameScene extends Phaser.Scene {
 
   // Doações das casas da cidade (tempo de jogo, pausado com modais)
   private cityHouses: CityHouse[] = [];
+  private carrosDoacao: CarroPopular[] = [];
   private prefeituraPos: { x: number; y: number } | null = null;
   private prefeituraSprite: Phaser.GameObjects.Sprite | null = null;
   private prefeituraFocusContainer: Phaser.GameObjects.Container | null = null;
@@ -153,10 +173,11 @@ export class GameScene extends Phaser.Scene {
     this.difficulty = DIFFICULTY_CONFIGS[diffLevel];
     this.forestHealth = BALANCE.INITIAL_FOREST_HEALTH;
     this.brigadistas = [];
+    this.carrosDoacao = [];
     this.guardas = [];
     this.trabalhadoresRurais = [];
     this.nextUnitId = 1;
-    this.spawnBrigadistaReadyAt = 0;
+    this.brigadistaBaseReadyAt = 0;
     this.spawnGuardaReadyAt = 0;
     this.firesExtinguished = 0;
     this.arsonistsCaptured = 0;
@@ -164,7 +185,7 @@ export class GameScene extends Phaser.Scene {
     this.isEnding = false;
     this.isStoryModalOpen = true;
     this.introStarted = false;
-    this.introBrigadista = null;
+    this.speakingBrigadista = null;
     this.brigadistaSpeechBubble = null;
     this.trabalhadorIntroShown = false;
     this.introTrabalhador = null;
@@ -185,6 +206,7 @@ export class GameScene extends Phaser.Scene {
     SoundManager.startMusic();
 
     this.setupScrollableCamera();
+    registerCollisionSystem(this, new CollisionSystem());
     this.drawConcentricSantaremMap();
 
     this.phaseSystem = new PoliticalPhaseSystem(BALANCE.INITIAL_CONSCIOUSNESS);
@@ -200,9 +222,12 @@ export class GameScene extends Phaser.Scene {
 
     this.indigenousShieldGraphics = this.add.graphics().setDepth(15);
 
-    // Personagens iniciais em lados opostos da Floresta: Brigadista ao Sul e os dois
+    // Personagens iniciais: Brigadista junto à base dos Brigadistas (noroeste da Floresta) e os dois
     // Trabalhadores Rurais ao Norte. Cada personagem nasce com 3 focos próximos de si.
-    const southSpot = { x: WORLD_CENTER_X + 60, y: WORLD_CENTER_Y + CAMPO_RADIUS_Y + 55 };
+    const brigadistaSpot = {
+      x: BASE_BRIGADISTA_X + BRIGADISTA_BASE_SPAWN_OFFSET.x,
+      y: BASE_BRIGADISTA_Y + BRIGADISTA_BASE_SPAWN_OFFSET.y
+    };
     const northSpotY = WORLD_CENTER_Y - CAMPO_RADIUS_Y - 55;
     const northSpots = [
       { x: WORLD_CENTER_X - 240, y: northSpotY },
@@ -214,14 +239,14 @@ export class GameScene extends Phaser.Scene {
       [55, 0],
       [0, -20]
     ];
-    for (const spot of [southSpot, ...northSpots]) {
+    for (const spot of [brigadistaSpot, ...northSpots]) {
       for (const [dx, dy] of initialFireOffsets) {
         this.fireSystem.spawnFire(spot.x + dx, spot.y + dy, 22);
       }
     }
 
     // Estado inicial do GDD (Fase 1): 1 Brigada Voluntária restrita ao anel da Floresta
-    const brigadista = this.spawnBrigadistaUnit(southSpot.x, southSpot.y, false, false);
+    const brigadista = this.spawnBrigadistaUnit(brigadistaSpot.x, brigadistaSpot.y, false, false);
     // Atualização com dt 0: sem movimento nem dano, só aplica a animação de combate
     // (o loop de update fica pausado enquanto o modal de história está aberto)
     brigadista?.update(0, this.fireSystem, this.boss);
@@ -457,8 +482,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * Foca o Brigadista Voluntário e, após 3 s, exibe a fala acima dele.
-   * Ocorre uma única vez por partida, pois o modal de contexto pode ser reaberto pelo HUD.
+   * Foca o Brigadista Voluntário ao iniciar a partida. Ele começa com energia cheia e a fala
+   * de exaustão só aparece quando a energia chegar ao mínimo (ver showBrigadistaExhaustedBubble).
    */
   public startBrigadistaIntro(): void {
     if (this.introStarted) return;
@@ -466,24 +491,27 @@ export class GameScene extends Phaser.Scene {
     if (!voluntario) return;
 
     this.introStarted = true;
-    this.introBrigadista = voluntario;
-    voluntario.setStamina(BRIGADISTA_INTRO_STAMINA);
     this.followEntity(voluntario);
+  }
 
-    this.time.delayedCall(BRIGADISTA_INTRO_DELAY_MS, () => {
-      if (this.isEnding || this.brigadistaSpeechBubble) return;
+  /** Exibe a fala de exaustão acima do brigadista que chegou ao mínimo de energia. */
+  private showBrigadistaExhaustedBubble(brigadista: Brigadista): void {
+    if (this.isEnding) return;
 
-      const bubble = new SpeechBubble(this, BRIGADISTA_INTRO_TEXT);
-      bubble.once('tap', () => this.events.emit('show-donation-info'));
-      bubble.once('destroy', () => {
-        if (this.brigadistaSpeechBubble === bubble) {
-          this.brigadistaSpeechBubble = null;
-          this.introBrigadista = null;
-        }
-      });
-      this.brigadistaSpeechBubble = bubble;
-      this.updateBrigadistaSpeechBubble();
+    this.brigadistaSpeechBubble?.dismiss();
+    this.followEntity(brigadista);
+
+    const bubble = new SpeechBubble(this, BRIGADISTA_EXAUSTO_TEXT);
+    bubble.once('tap', () => this.events.emit('show-donation-info'));
+    bubble.once('destroy', () => {
+      if (this.brigadistaSpeechBubble === bubble) {
+        this.brigadistaSpeechBubble = null;
+        this.speakingBrigadista = null;
+      }
     });
+    this.speakingBrigadista = brigadista;
+    this.brigadistaSpeechBubble = bubble;
+    this.updateBrigadistaSpeechBubble();
   }
 
   /**
@@ -533,7 +561,7 @@ export class GameScene extends Phaser.Scene {
 
   // Mantém a ponta da cauda logo acima da cabeça do personagem, mesmo com ele em movimento
   private updateBrigadistaSpeechBubble(): void {
-    this.anchorSpeechBubble(this.brigadistaSpeechBubble, this.introBrigadista);
+    this.anchorSpeechBubble(this.brigadistaSpeechBubble, this.speakingBrigadista);
   }
 
   private updateTrabalhadorSpeechBubble(): void {
@@ -562,10 +590,9 @@ export class GameScene extends Phaser.Scene {
     const base = this.prefeituraSprite.getBottomCenter();
     const top = this.prefeituraSprite.getTopCenter();
 
-    const ring = this.add.ellipse(0, 0, 380, 190).setStrokeStyle(4, 0xfacc15, 1);
+    const ring = this.add.ellipse(0, 0, 620, 310).setStrokeStyle(4, 0xfacc15, 1);
     const label = this.add
       .text(0, 0, 'Toque na prefeitura', {
-        fontFamily: 'Courier New, monospace',
         fontSize: '12px',
         fontStyle: 'bold',
         color: '#fef08a',
@@ -608,11 +635,12 @@ export class GameScene extends Phaser.Scene {
 
   private createCityHouse(hx: number, hy: number): void {
     const sprite = this.add.sprite(hx, hy, 'casa_isometrica');
-    sprite.setScale(0.60);
+    sprite.setScale(1.3);
     sprite.setOrigin(0.5, 0.88);
     sprite.setDepth(hy);
 
-    const house: CityHouse = { id: this.cityHouses.length + 1, sprite, readyAt: 0 };
+    const obstacleId = getCollisionSystem(this).addObstacle(hx, hy, COLLISION.HOUSE_RADIUS);
+    const house: CityHouse = { id: this.cityHouses.length + 1, sprite, obstacleId, readyAt: 0 };
     this.cityHouses.push(house);
 
     sprite.setInteractive({ useHandCursor: true });
@@ -662,8 +690,24 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.showDonationFeedback(house.sprite.x, house.sprite.y);
+    this.launchDonationCar(house.sprite.x, house.sprite.y, house.obstacleId);
     this.startTrabalhadorIntro();
     return true;
+  }
+
+  /** Animação: carro popular sai da casa, leva a doação até a base dos brigadistas e volta para a casa. */
+  private launchDonationCar(homeX: number, homeY: number, homeObstacleId: string): void {
+    const collision = getCollisionSystem(this);
+    const dirX = homeX - BASE_BRIGADISTA_X;
+    const dirY = homeY - BASE_BRIGADISTA_Y;
+    const dirLen = Math.hypot(dirX, dirY) || 1;
+    // Para na borda da base, do lado por onde o carro chega
+    const stopDist = COLLISION.BASE_BRIGADISTA_RADIUS + COLLISION.AGENT_CLEARANCE + 8;
+    const destination = collision.snapToFree(
+      BASE_BRIGADISTA_X + (dirX / dirLen) * stopDist,
+      BASE_BRIGADISTA_Y + (dirY / dirLen) * stopDist
+    );
+    this.carrosDoacao.push(new CarroPopular(this, homeX, homeY, destination, homeObstacleId));
   }
 
   /** Centraliza a câmera numa casa aleatória e pede que o jogador toque em uma casa. */
@@ -682,7 +726,6 @@ export class GameScene extends Phaser.Scene {
     const ring = this.add.ellipse(0, 0, 90, 46).setStrokeStyle(3, 0xfacc15, 1);
     const label = this.add
       .text(0, -62, 'Toque em uma casa para doar', {
-        fontFamily: 'Courier New, monospace',
         fontSize: '12px',
         fontStyle: 'bold',
         color: '#fef08a',
@@ -720,7 +763,6 @@ export class GameScene extends Phaser.Scene {
 
     const feedback = this.add
       .text(x, y - 60, `+${gainText}% consciência\n+${BRIGADISTA_ENERGY_PERCENT}% energia`, {
-        fontFamily: 'Courier New, monospace',
         fontSize: '12px',
         fontStyle: 'bold',
         color: '#86efac',
@@ -770,7 +812,7 @@ export class GameScene extends Phaser.Scene {
 
     // Malha sutil de relevo / grid isométrico no solo
     g.lineStyle(1, 0x064e3b, 0.28);
-    for (let offset = -3800; offset <= 3800; offset += 180) {
+    for (let offset = -FLORESTA_OUTER_RADIUS; offset <= FLORESTA_OUTER_RADIUS; offset += 180) {
       g.beginPath();
       g.moveTo(cx + offset - 3000, cy - 1500 + (offset * 0.25));
       g.lineTo(cx + offset + 3000, cy + 1500 + (offset * 0.25));
@@ -818,10 +860,10 @@ export class GameScene extends Phaser.Scene {
     const markingsGraphics = this.add.graphics().setDepth(4);
 
     // Grid ortogonal isométrico ajustado para enquadramento idêntico à imagem de referência
-    const streetStep = 200;
-    const streetWidth = 28;
+    const streetStep = 240;
+    const streetWidth = 64;
     const halfWidth = streetWidth / 2;
-    const gridBound = 900; // Limite da malha viária da cidade (u, v de -900 a +900)
+    const gridBound = 4 * streetStep; // Limite da malha viária da cidade (u, v de -960 a +960)
 
     // 1. Ruas na diagonal noroeste-sudeste (direção U: v = constante, dx = +1, dy = +0.5)
     for (let k = -4; k <= 4; k++) {
@@ -839,7 +881,7 @@ export class GameScene extends Phaser.Scene {
       streetsGraphics.fillPath();
 
       // Linhas brancas tracejadas no centro da via (apenas entre os cruzamentos)
-      markingsGraphics.lineStyle(2, 0xf8fafc, 0.92);
+      markingsGraphics.lineStyle(3, 0xf8fafc, 0.92);
       for (let m = -4; m < 4; m++) {
         const uStart = m * streetStep + halfWidth + 6;
         const uEnd = (m + 1) * streetStep - halfWidth - 6;
@@ -861,17 +903,32 @@ export class GameScene extends Phaser.Scene {
       const u2 = u + halfWidth;
 
       streetsGraphics.fillStyle(0x222222, 1);
-      streetsGraphics.beginPath();
-      streetsGraphics.moveTo(cx + u1 - (-gridBound), cy + (u1 + (-gridBound)) * 0.5);
-      streetsGraphics.lineTo(cx + u2 - (-gridBound), cy + (u2 + (-gridBound)) * 0.5);
-      streetsGraphics.lineTo(cx + u2 - gridBound, cy + (u2 + gridBound) * 0.5);
-      streetsGraphics.lineTo(cx + u1 - gridBound, cy + (u1 + gridBound) * 0.5);
-      streetsGraphics.closePath();
-      streetsGraphics.fillPath();
+      // Na rua central (m === 0), interrompe o trecho entre v = halfWidth e v = streetStep - halfWidth
+      // para unir os dois quarteirões centrais (-1, 0) e (0, 0) onde fica a Prefeitura
+      const vSegments: Array<[number, number]> =
+        m === 0
+          ? [
+              [-gridBound, halfWidth],
+              [streetStep - halfWidth, gridBound]
+            ]
+          : [[-gridBound, gridBound]];
+
+      for (const [vMin, vMax] of vSegments) {
+        streetsGraphics.beginPath();
+        streetsGraphics.moveTo(cx + u1 - vMin, cy + (u1 + vMin) * 0.5);
+        streetsGraphics.lineTo(cx + u2 - vMin, cy + (u2 + vMin) * 0.5);
+        streetsGraphics.lineTo(cx + u2 - vMax, cy + (u2 + vMax) * 0.5);
+        streetsGraphics.lineTo(cx + u1 - vMax, cy + (u1 + vMax) * 0.5);
+        streetsGraphics.closePath();
+        streetsGraphics.fillPath();
+      }
 
       // Linhas brancas tracejadas no centro da via (apenas entre os cruzamentos)
-      markingsGraphics.lineStyle(2, 0xf8fafc, 0.92);
+      markingsGraphics.lineStyle(3, 0xf8fafc, 0.92);
       for (let k = -4; k < 4; k++) {
+        // Sem faixa tracejada no trecho removido entre os dois quarteirões da Prefeitura
+        if (m === 0 && k === 0) continue;
+
         const vStart = k * streetStep + halfWidth + 6;
         const vEnd = (k + 1) * streetStep - halfWidth - 6;
 
@@ -891,22 +948,38 @@ export class GameScene extends Phaser.Scene {
       for (let j = -4; j < 4; j++) {
         const uc = (i + 0.5) * streetStep;
         const vc = (j + 0.5) * streetStep;
-        const hx = cx + uc - vc;
-        const hy = cy + (uc + vc) * 0.5;
 
-        // Quadra central: apenas o Palácio Municipal (Prefeitura)
+        // Quarteirão (-1, 0) foi unificado com (0, 0) para abrigar a Prefeitura em quadra dupla
+        if (i === -1 && j === 0) {
+          continue;
+        }
+
+        // Quadra dupla central ((-1, 0) + (0, 0)): Palácio Municipal (Prefeitura) ocupando os 2 quarteirões somados
         if (i === 0 && j === 0) {
-          const prefeitura = this.add.sprite(hx, hy - 4, 'prefeitura');
+          const mergedUc = 0; // Centro entre os quarteirões i = -1 e i = 0
+          const mergedVc = vc; // 0.5 * streetStep
+          const px = cx + mergedUc - mergedVc + 12;
+          const py = cy + (mergedUc + mergedVc) * 0.5 - 10;
+
+          const prefeitura = this.add.sprite(px, py, 'prefeitura');
           prefeitura.setOrigin(0.5, 0.652);
-          prefeitura.setScale(330 / 2477);
-          prefeitura.setDepth(hy + 10);
+          prefeitura.setScale(580 / 2477);
+          prefeitura.setDepth(py + 14);
           prefeitura.setInteractive({ useHandCursor: true });
           prefeitura.on('pointerup', (pointer: Phaser.Input.Pointer) => {
             if (pointer.getDistance() > 10) return;
             this.onPrefeituraClicked();
           });
           this.prefeituraSprite = prefeitura;
-          this.prefeituraPos = { x: hx, y: hy - 4 };
+          this.prefeituraPos = { x: px, y: py };
+
+          const collision = getCollisionSystem(this);
+          for (const uOffset of [-0.5 * streetStep, 0, 0.5 * streetStep]) {
+            const obsU = mergedUc + uOffset;
+            const obsX = cx + obsU - mergedVc;
+            const obsY = cy + (obsU + mergedVc) * 0.5;
+            collision.addObstacle(obsX, obsY, COLLISION.PREFEITURA_RADIUS);
+          }
           continue;
         }
 
@@ -914,10 +987,7 @@ export class GameScene extends Phaser.Scene {
         let frontCount = 4;
         let backCount = 2;
 
-        if (i === -1 && j === 0) {
-          frontCount = 4;
-          backCount = 4; // Bloco centro-esquerdo: 2 fileiras cheias de 4 casas
-        } else if (i === -1 && j === -1) {
+        if (i === -1 && j === -1) {
           frontCount = 4;
           backCount = 0; // Bloco superior esquerdo: 1 fileira de 4 casas
         } else if (i === 0 && j === -1) {
@@ -964,16 +1034,16 @@ export class GameScene extends Phaser.Scene {
         }
 
         const getRowOffsets = (count: number): number[] => {
-          if (count === 4) return [-51, -17, 17, 51];
-          if (count === 3) return [-34, 0, 34];
-          if (count === 2) return [-20, 20];
+          if (count === 4) return [-66, -22, 22, 66];
+          if (count === 3) return [-44, 0, 44];
+          if (count === 2) return [-26, 26];
           if (count === 1) return [0];
           return [];
         };
 
         // Fileira frontal (voltada para a rua de baixo-esquerda)
         const frontOffsets = getRowOffsets(frontCount);
-        const frontV = vc + 16;
+        const frontV = vc + 22;
         for (const offU of frontOffsets) {
           const u = uc + offU;
           const hx = cx + u - frontV;
@@ -984,7 +1054,7 @@ export class GameScene extends Phaser.Scene {
 
         // Fileira traseira (recuada no quarteirão com espaçamento nítido para o gramado)
         const backOffsets = getRowOffsets(backCount);
-        const backV = vc - 44;
+        const backV = vc - 60;
         for (const offU of backOffsets) {
           const u = uc + offU;
           const hx = cx + u - backV;
@@ -1003,16 +1073,75 @@ export class GameScene extends Phaser.Scene {
         .setOrigin(0.5, 0.9)
         .setDepth(15 + Math.floor(pt.y))
         .setAlpha(0.96);
+      getCollisionSystem(this).addObstacle(pt.x, pt.y, COLLISION.FARM_RADIUS);
     }
 
+    // Sede dos Brigadistas Voluntários no anel da Floresta (noroeste, distância isométrica ~3400)
+    const baseX = BASE_BRIGADISTA_X;
+    const baseY = BASE_BRIGADISTA_Y;
+    const baseSprite = this.add
+      .sprite(baseX, baseY, 'base_brigadista_voluntario')
+      .setOrigin(0.5, 0.75)
+      .setScale(440 / 2338);
+    baseSprite.setDepth(15 + Math.floor(baseY + baseSprite.displayHeight * 0.25));
+    baseSprite.setInteractive({ useHandCursor: true });
+    baseSprite.on('pointerup', (pointer: Phaser.Input.Pointer) => {
+      // Arrastar o mapa não conta como toque na base
+      if (pointer.getDistance() > 10) return;
+      this.onBrigadistaBaseClicked();
+    });
+    getCollisionSystem(this).addObstacle(baseX, baseY, COLLISION.BASE_BRIGADISTA_RADIUS);
+
     // Props da FLORESTA QUADRADA ISOMÉTRICA (Samaúmas e Castanheiras)
-    for (let i = 0; i < 48; i++) {
-      const pt = getRandomPointInSector(SectorType.FLORESTA, 40);
-      this.add
+    // Clareira ao redor da sede: nenhuma árvore nasce sobre o prédio
+    const baseClearing = 260;
+    for (let i = 0; i < 200; i++) {
+      let pt = getRandomPointInSector(SectorType.FLORESTA, 40);
+      while (getIsoDistance(pt.x, pt.y, baseX, baseY) < baseClearing) {
+        pt = getRandomPointInSector(SectorType.FLORESTA, 40);
+      }
+      const sprite = this.add
         .sprite(pt.x, pt.y, 'prop_tree')
         .setOrigin(0.5, 0.92)
+        .setScale(3)
         .setDepth(15 + Math.floor(pt.y))
         .setAlpha(0.98);
+      getCollisionSystem(this).addObstacle(pt.x, pt.y, COLLISION.TREE_RADIUS);
+      this.forestTrees.push({ x: pt.x, y: pt.y, sprite, state: 'healthy', burnLeftMs: 0 });
+    }
+  }
+
+  // Árvores saudáveis perto de um foco ativo pegam fogo; a árvore em chamas vira um foco próprio
+  private updateForestTrees(deltaMs: number): void {
+    for (const tree of this.forestTrees) {
+      if (tree.state !== 'burning') continue;
+      tree.burnLeftMs -= deltaMs;
+      if (tree.burnLeftMs <= 0) {
+        tree.state = 'burned';
+        tree.sprite.setTint(0x3f3f46);
+      }
+    }
+
+    this.treeFireTimer += deltaMs;
+    if (this.treeFireTimer < TREE_FIRE.CHECK_INTERVAL_MS) return;
+    this.treeFireTimer = 0;
+
+    const fires = this.fireSystem.getActiveFires();
+    if (fires.length === 0) return;
+
+    for (const tree of this.forestTrees) {
+      if (tree.state !== 'healthy') continue;
+      for (const fire of fires) {
+        if (getIsoDistance(tree.x, tree.y, fire.data.x, fire.data.y) > TREE_FIRE.IGNITION_RADIUS) continue;
+        const chance = TREE_FIRE.IGNITION_CHANCE_PER_CHECK * (fire.data.intensity / 100);
+        if (Math.random() < chance) {
+          tree.state = 'burning';
+          tree.burnLeftMs = TREE_FIRE.BURN_DURATION_MS;
+          tree.sprite.setTint(0xff7a1a);
+          this.fireSystem.spawnFire(tree.x, tree.y, TREE_FIRE.INITIAL_INTENSITY);
+          break;
+        }
+      }
     }
   }
 
@@ -1141,6 +1270,9 @@ export class GameScene extends Phaser.Scene {
     unit.on('unit-tapped', (clicked: Unit) => {
       this.followEntity(clicked);
     });
+    unit.on('brigadista-exhausted', (exhausted: Brigadista) => {
+      this.showBrigadistaExhaustedBubble(exhausted);
+    });
     if (focusCamera) {
       this.centerCameraOnPoint(x, y, true);
     }
@@ -1217,14 +1349,36 @@ export class GameScene extends Phaser.Scene {
     return -1;
   }
 
-  public tryRecruitBrigadista(): boolean {
-    if (!this.phaseSystem.isBrigadaComunitariaUnlocked()) return false;
-    if (this.brigadistas.length >= BALANCE.MAX_BRIGADISTAS) return false;
-    if (this.time.now < this.spawnBrigadistaReadyAt) return false;
+  private onBrigadistaBaseClicked(): void {
+    if (this.isEnding || this.isStoryModalOpen) return;
+    SoundManager.unlock();
+    SoundManager.playSelect();
+    this.clearHouseFocus();
+    this.clearPrefeituraFocus();
+    this.events.emit('brigadista-base-clicked');
+  }
 
-    this.spawnBrigadistaReadyAt = this.time.now + BALANCE.COOLDOWNS.SPAWN_BRIGADISTA;
-    const pt = getRandomPointInSector(SectorType.CIDADE, 40);
-    this.spawnBrigadistaUnit(pt.x, pt.y, true, true);
+  public getBrigadistaLimit(): number {
+    return this.phaseSystem.isAjusteFiscalActive()
+      ? BALANCE.BRIGADISTA_BASE_MAX_AJUSTE_FISCAL
+      : BALANCE.MAX_BRIGADISTAS;
+  }
+
+  public getBrigadistaBaseCooldownRemainingMs(): number {
+    return Math.max(0, this.brigadistaBaseReadyAt - this.time.now);
+  }
+
+  public tryRecruitBrigadista(): boolean {
+    if (this.brigadistas.length >= this.getBrigadistaLimit()) return false;
+    if (this.getBrigadistaBaseCooldownRemainingMs() > 0) return false;
+
+    const spawnX = BASE_BRIGADISTA_X + BRIGADISTA_BASE_SPAWN_OFFSET.x;
+    const spawnY = BASE_BRIGADISTA_Y + BRIGADISTA_BASE_SPAWN_OFFSET.y;
+    const isComunitario = !this.phaseSystem.isAjusteFiscalActive();
+    const unit = this.spawnBrigadistaUnit(spawnX, spawnY, isComunitario, true);
+    if (!unit) return false;
+
+    this.brigadistaBaseReadyAt = this.time.now + BALANCE.COOLDOWNS.SPAWN_BRIGADISTA_BASE;
     SoundManager.playSelect();
     return true;
   }
@@ -1239,11 +1393,6 @@ export class GameScene extends Phaser.Scene {
     this.spawnGuardaUnit(pt.x, pt.y, true);
     SoundManager.playSelect();
     return true;
-  }
-
-  public getBrigadistaRecruitCooldownRatio(): number {
-    if (this.time.now >= this.spawnBrigadistaReadyAt) return 0;
-    return (this.spawnBrigadistaReadyAt - this.time.now) / BALANCE.COOLDOWNS.SPAWN_BRIGADISTA;
   }
 
   public getGuardaRecruitCooldownRatio(): number {
@@ -1301,7 +1450,6 @@ export class GameScene extends Phaser.Scene {
 
     const badge = this.add
       .text(ax, ay - 10, '⛓️ CAPTURADO!', {
-        fontFamily: 'Courier New, monospace',
         fontSize: '11px',
         fontStyle: 'bold',
         color: '#fef08a',
@@ -1393,11 +1541,14 @@ export class GameScene extends Phaser.Scene {
     }
 
     for (const brig of this.brigadistas) {
-      // Mantém a energia no mínimo durante a intro, senão a regeneração a recuperaria antes da fala
-      if (brig === this.introBrigadista) brig.setStamina(BRIGADISTA_INTRO_STAMINA);
       brig.update(deltaMs, this.fireSystem, this.boss);
     }
     this.updateBrigadistaSpeechBubble();
+
+    for (const carro of this.carrosDoacao) {
+      carro.update(deltaMs);
+    }
+    this.carrosDoacao = this.carrosDoacao.filter((carro) => carro.isAlive());
 
     for (const guarda of this.guardas) {
       guarda.update(deltaMs, arsonists, this.boss, (captured) =>
@@ -1416,6 +1567,7 @@ export class GameScene extends Phaser.Scene {
       this.difficulty.fireGrowthMultiplier,
       this.phaseSystem.isIndigenousDemarcationActive()
     );
+    this.updateForestTrees(deltaMs);
 
     this.forestHealth = Phaser.Math.Clamp(this.forestHealth - forestDamage, 0, 100);
 

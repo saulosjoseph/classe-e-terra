@@ -1,6 +1,9 @@
 import Phaser from 'phaser';
 import {
+  BASE_BRIGADISTA_X,
+  BASE_BRIGADISTA_Y,
   CAMPO_RADIUS,
+  COLLISION,
   FLORESTA_OUTER_RADIUS,
   ISO_Y_RATIO,
   WORLD_CENTER_X,
@@ -12,6 +15,13 @@ import { SectorType, UnitType } from '../types/GameTypes';
 import { BossFortress } from './BossFortress';
 import { Unit } from './Unit';
 
+/** Energia mínima: ao chegar aqui a Brigada fica exausta e volta para a base */
+const MIN_STAMINA = 5;
+/** Raio (distância isométrica) da base em que a Brigada recarrega a energia */
+const BASE_RECHARGE_RADIUS = COLLISION.BASE_BRIGADISTA_RADIUS + 40;
+/** Distância do centro da base até o ponto onde a Brigada para: borda da base + folga */
+const BASE_STOP_DIST = COLLISION.BASE_BRIGADISTA_RADIUS + COLLISION.AGENT_CLEARANCE + 8;
+
 /**
  * Brigada Voluntária (Fase 1: isolada na Floresta, cansa rápido)
  * Evolui aos 20% de Consciência para Brigadista Comunitário (atua nos 3 setores).
@@ -20,6 +30,7 @@ import { Unit } from './Unit';
 export class Brigadista extends Unit {
   private extinguishPower = 20;
   private unitIndex: number;
+  private exhaustionNotified = false;
 
   constructor(
     scene: Phaser.Scene,
@@ -98,14 +109,22 @@ export class Brigadista extends Unit {
     const dtSec = deltaMs / 1000;
     const smokeAtPos = fireSystem.getSmokeLevelAtPoint(this.x, this.y);
 
+    // A energia só volta ao máximo na base (além das doações da cidade)
+    if (this.isExhausted() && this.isNearBase()) {
+      this.stamina = this.maxStamina;
+    }
+    const exhausted = this.isExhausted();
+
     // 1. Busca automaticamente qualquer foco de incêndio compatível em todo o mapa!
-    const activeFires = fireSystem.getActiveFires().filter((f) => {
-      // Na Fase 1, Brigada Voluntária só atua no anel da Floresta
-      if (this.unitType === UnitType.BRIGADA_VOLUNTARIA) {
-        return f.data.sector === SectorType.FLORESTA;
-      }
-      return true;
-    });
+    const activeFires = exhausted
+      ? []
+      : fireSystem.getActiveFires().filter((f) => {
+          // Na Fase 1, Brigada Voluntária só atua no anel da Floresta
+          if (this.unitType === UnitType.BRIGADA_VOLUNTARIA) {
+            return f.data.sector === SectorType.FLORESTA;
+          }
+          return true;
+        });
 
     let targetFire: ActiveFireInstance | null = null;
     let nearestDist = Infinity;
@@ -121,7 +140,10 @@ export class Brigadista extends Unit {
       }
     }
 
-    if (targetFire) {
+    if (exhausted) {
+      // Exausta: não combate e segue para a base até recarregar
+      this.setBaseStopTarget();
+    } else if (targetFire) {
       this.setCommandTarget(targetFire.data.x, targetFire.data.y);
     } else if (boss && boss.isActive()) {
       // 2. Se não há incêndios ativos e o Burguês se revelou, marcha automaticamente para cercar a Fortaleza!
@@ -158,11 +180,10 @@ export class Brigadista extends Unit {
       fireSystem.extinguishFire(targetFire.data.id, power);
 
       const drainRate = this.unitType === UnitType.BRIGADA_VOLUNTARIA ? 5 : 2;
-      this.stamina = Math.max(5, this.stamina - drainRate * dtSec);
-    } else {
-      const regenRate = smokeAtPos >= 3 ? 0.5 : 1;
-      this.stamina = Math.min(this.maxStamina, this.stamina + regenRate * dtSec);
+      this.stamina = Math.max(MIN_STAMINA, this.stamina - drainRate * dtSec);
     }
+
+    this.checkExhaustion();
 
     // Gerencia animações do Brigadista Voluntário (idle, caminhada e combate ao fogo)
     this.updateAnimation(isExtinguishing, targetFire);
@@ -176,6 +197,37 @@ export class Brigadista extends Unit {
     }
 
     this.drawOverlays();
+  }
+
+  private isExhausted(): boolean {
+    return this.stamina <= MIN_STAMINA;
+  }
+
+  private isNearBase(): boolean {
+    return getIsoDistance(this.x, this.y, BASE_BRIGADISTA_X, BASE_BRIGADISTA_Y) <= BASE_RECHARGE_RADIUS;
+  }
+
+  /** Mira o ponto da borda da base do lado por onde a Brigada se aproxima */
+  private setBaseStopTarget(): void {
+    // Direção calculada no plano do solo (Y comprimido por ISO_Y_RATIO)
+    const dx = this.x - BASE_BRIGADISTA_X;
+    const dy = (this.y - BASE_BRIGADISTA_Y) / ISO_Y_RATIO;
+    const len = Math.hypot(dx, dy) || 1;
+    this.setCommandTarget(
+      BASE_BRIGADISTA_X + (dx / len) * BASE_STOP_DIST,
+      BASE_BRIGADISTA_Y + ((dy / len) * BASE_STOP_DIST) * ISO_Y_RATIO
+    );
+  }
+
+  /** Emite a fala de exaustão toda vez que a energia chega ao mínimo */
+  private checkExhaustion(): void {
+    if (!this.isExhausted()) {
+      this.exhaustionNotified = false;
+      return;
+    }
+    if (this.exhaustionNotified) return;
+    this.exhaustionNotified = true;
+    this.emit('brigadista-exhausted', this);
   }
 
   private updateAnimation(isExtinguishing: boolean, targetFire: ActiveFireInstance | null): void {

@@ -48,7 +48,6 @@ export class BossFortress extends Phaser.Events.EventEmitter {
     this.hpGraphics = scene.add.graphics().setDepth(25 + Math.floor(this.y)).setVisible(false);
     this.titleText = scene.add
       .text(this.x, this.y - 56, '🎩 O BURGUÊS', {
-        fontFamily: 'Courier New, monospace',
         fontSize: '12px',
         fontStyle: 'bold',
         color: '#fef08a',

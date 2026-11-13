@@ -8,6 +8,7 @@ export class BootScene extends Phaser.Scene {
 
   public preload(): void {
     this.load.image('prefeitura', 'assets/prefeitura.png');
+    this.load.image('base_brigadista_voluntario', 'assets/base_brigadista_voluntario.png');
     this.load.spritesheet('brigadista_voluntario', 'assets/brigadista_voluntario.png', {
       frameWidth: 128,
       frameHeight: 128
@@ -24,6 +25,10 @@ export class BootScene extends Phaser.Scene {
       frameWidth: 128,
       frameHeight: 128
     });
+    this.load.image('carro_popular_vermelho', 'assets/carro_popular_vermelho.png');
+    this.load.image('carro_popular_amarelo', 'assets/carro_popular_amarelo.png');
+    this.load.image('carro_popular_preto', 'assets/carro_popular_preto.png');
+    this.load.image('carro_popular_prata', 'assets/carro_popular_prata.png');
   }
 
   public create(): void {

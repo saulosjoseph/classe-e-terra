@@ -249,7 +249,6 @@ export class SectorSystem extends Phaser.Events.EventEmitter {
     const orb = this.scene.add.circle(startPt.x, startPt.y, 8, colorHex, 1).setDepth(42);
     const label = this.scene.add
       .text(startPt.x, startPt.y - 14, badgeText, {
-        fontFamily: 'Courier New, monospace',
         fontSize: '12px',
         fontStyle: 'bold',
         color: '#ffffff',
@@ -281,7 +280,6 @@ export class SectorSystem extends Phaser.Events.EventEmitter {
   private spawnFloatingText(x: number, y: number, message: string, color: string): void {
     const txt = this.scene.add
       .text(x, y, message, {
-        fontFamily: 'Courier New, monospace',
         fontSize: '12px',
         fontStyle: 'bold',
         color,

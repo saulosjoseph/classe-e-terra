@@ -30,7 +30,6 @@ export class MenuScene extends Phaser.Scene {
     // Cabeçalho centralizado no topo
     this.add
       .text(GAME_WIDTH / 2, 26, 'CLASSE E TERRA: A UNIÃO DO TAPAJÓS', {
-        fontFamily: 'Courier New, monospace',
         fontSize: '24px',
         fontStyle: 'bold',
         color: '#4ade80',
@@ -45,7 +44,6 @@ export class MenuScene extends Phaser.Scene {
         54,
         'Santarém & Baixo Tapajós em Luta! Una Cidade, Campo e Floresta contra a fumaça tóxica e o Burguês.',
         {
-          fontFamily: 'Courier New, monospace',
           fontSize: '11px',
           color: '#e4e4e7',
           align: 'center'
@@ -64,7 +62,6 @@ export class MenuScene extends Phaser.Scene {
     const leftX = 198;
     this.add
       .text(leftX, 130, 'ESCOLHA A DIFICULDADE:', {
-        fontFamily: 'Courier New, monospace',
         fontSize: '13px',
         fontStyle: 'bold',
         color: '#facc15'
@@ -73,7 +70,6 @@ export class MenuScene extends Phaser.Scene {
 
     this.add
       .text(leftX, 146, '(Escala o ganho das Ações Integradas)', {
-        fontFamily: 'Courier New, monospace',
         fontSize: '10px',
         color: '#a1a1aa'
       })
@@ -96,7 +92,6 @@ export class MenuScene extends Phaser.Scene {
 
       const title = this.add
         .text(leftX, y - 8, cfg.label, {
-          fontFamily: 'Courier New, monospace',
           fontSize: '14px',
           fontStyle: 'bold',
           color: '#ffffff'
@@ -105,7 +100,6 @@ export class MenuScene extends Phaser.Scene {
 
       const sub = this.add
         .text(leftX, y + 10, cfg.subtitle, {
-          fontFamily: 'Courier New, monospace',
           fontSize: '11px',
           color: '#cbd5e1'
         })
@@ -135,7 +129,6 @@ export class MenuScene extends Phaser.Scene {
         tipsBox.y,
         '📱 JOGABILIDADE MOBILE (PAISAGEM):\n\n• ARRASTE O MAPA para explorar\n  (Cidade ➔ Campo ➔ Floresta).\n• Brigadistas e Guardas agem SOZINHOS\n  contra o fogo e os incendiários!\n• Use a barra inferior para acionar as\n  Ações Integradas e invocar reforços!',
         {
-          fontFamily: 'Courier New, monospace',
           fontSize: '10px',
           color: '#d1fae5',
           align: 'left',
@@ -151,7 +144,6 @@ export class MenuScene extends Phaser.Scene {
 
     const startTxt = this.add
       .text(rightX, 316, 'INICIAR', {
-        fontFamily: 'Courier New, monospace',
         fontSize: '17px',
         fontStyle: 'bold',
         color: '#052e16'
@@ -176,7 +168,6 @@ export class MenuScene extends Phaser.Scene {
     // Botões de Tela Cheia e Áudio no rodapé
     const fullscreenBtn = this.add
       .text(18, GAME_HEIGHT - 18, this.getFullscreenLabel(), {
-        fontFamily: 'Courier New, monospace',
         fontSize: '11px',
         color: '#a1a1aa',
         backgroundColor: '#18181b',
@@ -213,7 +204,6 @@ export class MenuScene extends Phaser.Scene {
 
     const audioBtn = this.add
       .text(GAME_WIDTH - 18, GAME_HEIGHT - 18, this.getAudioLabel(), {
-        fontFamily: 'Courier New, monospace',
         fontSize: '11px',
         color: '#a1a1aa',
         backgroundColor: '#18181b',

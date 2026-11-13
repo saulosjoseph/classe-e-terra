@@ -92,11 +92,13 @@ export class UIScene extends Phaser.Scene {
     this.gameScene.events.on('show-trabalhador-info', this.showTrabalhadorInfoModal, this);
     this.gameScene.events.on('prefeitura-clicked', this.showPrefeituraInfoModal, this);
     this.gameScene.events.on('house-clicked', this.showHouseDonationPanel, this);
+    this.gameScene.events.on('brigadista-base-clicked', this.showBrigadistaBaseModal, this);
     this.events.once('shutdown', () => {
       this.gameScene.events.off('show-donation-info', this.showDonationInfoModal, this);
       this.gameScene.events.off('show-trabalhador-info', this.showTrabalhadorInfoModal, this);
       this.gameScene.events.off('prefeitura-clicked', this.showPrefeituraInfoModal, this);
       this.gameScene.events.off('house-clicked', this.showHouseDonationPanel, this);
+      this.gameScene.events.off('brigadista-base-clicked', this.showBrigadistaBaseModal, this);
     });
 
     this.gameScene.phaseSystem.on(
@@ -116,7 +118,6 @@ export class UIScene extends Phaser.Scene {
 
     // Saúde da Floresta (Esquerda: x=14..184)
     this.add.text(14, 7, '🌳 FLORESTA', {
-      fontFamily: 'Courier New, monospace',
       fontSize: '11px',
       fontStyle: 'bold',
       color: '#4ade80'
@@ -124,7 +125,6 @@ export class UIScene extends Phaser.Scene {
 
     this.forestValueText = this.add
       .text(184, 7, '100%', {
-        fontFamily: 'Courier New, monospace',
         fontSize: '11px',
         fontStyle: 'bold',
         color: '#ffffff'
@@ -134,7 +134,6 @@ export class UIScene extends Phaser.Scene {
     // Fase Política e Status (Centro: x=360)
     this.phaseTitleText = this.add
       .text(GAME_WIDTH / 2, 14, 'Fase 1: Resistência Sufocada', {
-        fontFamily: 'Courier New, monospace',
         fontSize: '12px',
         fontStyle: 'bold',
         color: '#fde047'
@@ -143,7 +142,6 @@ export class UIScene extends Phaser.Scene {
 
     this.statusChipsText = this.add
       .text(GAME_WIDTH / 2, 34, '', {
-        fontFamily: 'Courier New, monospace',
         fontSize: '9.5px',
         color: '#d4d4d8'
       })
@@ -151,7 +149,6 @@ export class UIScene extends Phaser.Scene {
 
     // Consciência Coletiva (Direita: x=536..706)
     this.add.text(536, 7, '✊ CONSCIÊNCIA', {
-      fontFamily: 'Courier New, monospace',
       fontSize: '11px',
       fontStyle: 'bold',
       color: '#38bdf8'
@@ -159,7 +156,6 @@ export class UIScene extends Phaser.Scene {
 
     this.consciousnessValueText = this.add
       .text(GAME_WIDTH - 14, 7, '0%', {
-        fontFamily: 'Courier New, monospace',
         fontSize: '11px',
         fontStyle: 'bold',
         color: '#ffffff'
@@ -186,7 +182,6 @@ export class UIScene extends Phaser.Scene {
 
     this.currentSectorBadge = this.add
       .text(12, MAP_TOP_Y + 8, '📍 CIDADE (Centro) • Arraste p/ mover o mapa', {
-        fontFamily: 'Courier New, monospace',
         fontSize: '10px',
         fontStyle: 'bold',
         color: '#fef08a',
@@ -197,7 +192,6 @@ export class UIScene extends Phaser.Scene {
 
     this.cameraFollowChip = this.add
       .text(12, MAP_TOP_Y + 32, '', {
-        fontFamily: 'Courier New, monospace',
         fontSize: '10px',
         fontStyle: 'bold',
         color: '#fef08a',
@@ -216,7 +210,6 @@ export class UIScene extends Phaser.Scene {
 
     const btnCity = this.add
       .text(12, MAP_BOTTOM_Y - 26, '🏙️ IR P/ CIDADE', {
-        fontFamily: 'Courier New, monospace',
         fontSize: '10px',
         fontStyle: 'bold',
         color: '#ffffff',
@@ -234,7 +227,6 @@ export class UIScene extends Phaser.Scene {
 
     const btnAlert = this.add
       .text(136, MAP_BOTTOM_Y - 26, '🔥 IR P/ FOGO', {
-        fontFamily: 'Courier New, monospace',
         fontSize: '10px',
         fontStyle: 'bold',
         color: '#fef08a',
@@ -264,7 +256,6 @@ export class UIScene extends Phaser.Scene {
 
     const btnZoomIn = this.add
       .text(244, MAP_BOTTOM_Y - 26, '🔍 +', {
-        fontFamily: 'Courier New, monospace',
         fontSize: '10px',
         fontStyle: 'bold',
         color: '#ffffff',
@@ -280,7 +271,6 @@ export class UIScene extends Phaser.Scene {
 
     const btnZoomOut = this.add
       .text(290, MAP_BOTTOM_Y - 26, '🔍 -', {
-        fontFamily: 'Courier New, monospace',
         fontSize: '10px',
         fontStyle: 'bold',
         color: '#ffffff',
@@ -296,7 +286,6 @@ export class UIScene extends Phaser.Scene {
 
     const btnStory = this.add
       .text(336, MAP_BOTTOM_Y - 26, '📜 HISTÓRIA', {
-        fontFamily: 'Courier New, monospace',
         fontSize: '10px',
         fontStyle: 'bold',
         color: '#fef08a',
@@ -314,7 +303,6 @@ export class UIScene extends Phaser.Scene {
 
     const btnFullscreen = this.add
       .text(GAME_WIDTH - 12, MAP_BOTTOM_Y - 26, this.getFullscreenLabel(), {
-        fontFamily: 'Courier New, monospace',
         fontSize: '10px',
         fontStyle: 'bold',
         color: '#e4e4e7',
@@ -380,7 +368,6 @@ export class UIScene extends Phaser.Scene {
 
     this.add
       .text(72, MAP_BOTTOM_Y + 23, '🤝 INTEGRADAS', {
-        fontFamily: 'Courier New, monospace',
         fontSize: '11px',
         fontStyle: 'bold',
         color: '#ffffff'
@@ -394,7 +381,6 @@ export class UIScene extends Phaser.Scene {
 
     this.add
       .text(72, MAP_BOTTOM_Y + 59, '🧯 DEFESA/UNID.', {
-        fontFamily: 'Courier New, monospace',
         fontSize: '11px',
         fontStyle: 'bold',
         color: '#e4e4e7'
@@ -495,16 +481,8 @@ export class UIScene extends Phaser.Scene {
       onClick: () => void;
     }> = [
       {
-        key: 'RECRUIT_BRIGADISTA',
-        x: 198,
-        title: '🧯 BRIGADA',
-        sub: 'Requer 20%',
-        color: 0x9a3412,
-        onClick: () => this.gameScene.tryRecruitBrigadista()
-      },
-      {
         key: 'RECRUIT_GUARDA',
-        x: 312,
+        x: 198,
         title: '🎯 GUARDA',
         sub: 'Requer 50%',
         color: 0x065f46,
@@ -512,7 +490,7 @@ export class UIScene extends Phaser.Scene {
       },
       {
         key: LocalActionType.CAMPO_ACEIRO,
-        x: 426,
+        x: 312,
         title: '🛡️ ACEIRO',
         sub: 'Anel no Campo',
         color: 0x78350f,
@@ -520,7 +498,7 @@ export class UIScene extends Phaser.Scene {
       },
       {
         key: LocalActionType.CIDADE_BARREIRA_EXAUSTAO,
-        x: 540,
+        x: 426,
         title: '💨 EXAUSTÃO',
         sub: 'Limpa Fumaça',
         color: 0x1e3a8a,
@@ -529,7 +507,7 @@ export class UIScene extends Phaser.Scene {
       },
       {
         key: LocalActionType.FLORESTA_REFLORESTAMENTO,
-        x: 654,
+        x: 540,
         title: '🌱 PLANTIO',
         sub: '+12% Floresta',
         color: 0x14532d,
@@ -578,7 +556,6 @@ export class UIScene extends Phaser.Scene {
 
     const titleText = this.add
       .text(x, y - 10, title, {
-        fontFamily: 'Courier New, monospace',
         fontSize: width < 120 ? '11px' : '12px',
         fontStyle: 'bold',
         color: '#ffffff'
@@ -587,7 +564,6 @@ export class UIScene extends Phaser.Scene {
 
     const subText = this.add
       .text(x, y + 11, sub, {
-        fontFamily: 'Courier New, monospace',
         fontSize: '9.5px',
         color: '#e2e8f0'
       })
@@ -632,7 +608,6 @@ export class UIScene extends Phaser.Scene {
 
     this.bannerTitle = this.add
       .text(0, -10, '', {
-        fontFamily: 'Courier New, monospace',
         fontSize: '12px',
         fontStyle: 'bold',
         color: '#fde047'
@@ -641,7 +616,6 @@ export class UIScene extends Phaser.Scene {
 
     this.bannerSub = this.add
       .text(0, 9, '', {
-        fontFamily: 'Courier New, monospace',
         fontSize: '10px',
         color: '#f4f4f5',
         align: 'center',
@@ -699,7 +673,6 @@ export class UIScene extends Phaser.Scene {
 
     // const titleBadge = this.add
     //   .text(boxX, boxY - boxH / 2 + 25, '✊ CONTEXTO HISTÓRICO • A LUTA NO TAPAJÓS', {
-    //     fontFamily: 'Courier New, monospace',
     //     fontSize: '13px',
     //     fontStyle: 'bold',
     //     color: '#fde047'
@@ -717,7 +690,6 @@ export class UIScene extends Phaser.Scene {
 
     const contentText = this.add
       .text(boxX, boxY - 14, storyText, {
-        fontFamily: 'Courier New, monospace',
         fontSize: '11px',
         color: '#f4f4f5',
         align: 'left',
@@ -737,7 +709,6 @@ export class UIScene extends Phaser.Scene {
 
     const btnText = this.add
       .text(boxX, btnY, 'Ok', {
-        fontFamily: 'Courier New, monospace',
         fontSize: '12px',
         fontStyle: 'bold',
         color: '#052e16'
@@ -771,8 +742,8 @@ export class UIScene extends Phaser.Scene {
       });
     };
 
-    startBtn.on('pointerdown', closeModal);
-    backdrop.on('pointerdown', closeModal);
+    startBtn.on('pointerup', closeModal);
+    backdrop.on('pointerup', closeModal);
 
     modalContainer.add([
       backdrop,
@@ -815,7 +786,6 @@ export class UIScene extends Phaser.Scene {
 
     const contentText = this.add
       .text(boxX, boxY - 22, infoText, {
-        fontFamily: 'Courier New, monospace',
         fontSize: '12px',
         color: '#f4f4f5',
         align: 'left',
@@ -835,7 +805,6 @@ export class UIScene extends Phaser.Scene {
 
     const okText = this.add
       .text(boxX, btnY, 'Ir para cidade', {
-        fontFamily: 'Courier New, monospace',
         fontSize: '12px',
         fontStyle: 'bold',
         color: '#052e16'
@@ -850,11 +819,11 @@ export class UIScene extends Phaser.Scene {
       modalContainer.destroy();
     };
 
-    okBtn.on('pointerdown', () => {
+    okBtn.on('pointerup', () => {
       closeModal();
       this.gameScene.focusRandomHouse();
     });
-    backdrop.on('pointerdown', closeModal);
+    backdrop.on('pointerup', closeModal);
 
     modalContainer.add([backdrop, boxBg, innerBorder, contentText, okBtn, okText]);
   }
@@ -887,7 +856,6 @@ export class UIScene extends Phaser.Scene {
 
     const contentText = this.add
       .text(boxX, boxY - 22, infoText, {
-        fontFamily: 'Courier New, monospace',
         fontSize: '12px',
         color: '#f4f4f5',
         align: 'left',
@@ -907,7 +875,6 @@ export class UIScene extends Phaser.Scene {
 
     const prefeituraText = this.add
       .text(boxX, btnY, 'Ir para a prefeitura', {
-        fontFamily: 'Courier New, monospace',
         fontSize: '12px',
         fontStyle: 'bold',
         color: '#052e16'
@@ -922,11 +889,11 @@ export class UIScene extends Phaser.Scene {
       modalContainer.destroy();
     };
 
-    prefeituraBtn.on('pointerdown', () => {
+    prefeituraBtn.on('pointerup', () => {
       closeModal();
       this.gameScene.focusPrefeitura();
     });
-    backdrop.on('pointerdown', closeModal);
+    backdrop.on('pointerup', closeModal);
 
     modalContainer.add([backdrop, boxBg, innerBorder, contentText, prefeituraBtn, prefeituraText]);
   }
@@ -959,7 +926,6 @@ export class UIScene extends Phaser.Scene {
 
     const title = this.add
       .text(boxX, boxY - boxH / 2 + 28, 'PREFEITURA', {
-        fontFamily: 'Courier New, monospace',
         fontSize: '13px',
         fontStyle: 'bold',
         color: '#fde047'
@@ -968,7 +934,6 @@ export class UIScene extends Phaser.Scene {
 
     const contentText = this.add
       .text(boxX, boxY + 4, infoText, {
-        fontFamily: 'Courier New, monospace',
         fontSize: '12px',
         color: '#f4f4f5',
         align: 'left',
@@ -988,7 +953,6 @@ export class UIScene extends Phaser.Scene {
 
     const closeText = this.add
       .text(boxX, btnY, 'Fechar', {
-        fontFamily: 'Courier New, monospace',
         fontSize: '12px',
         fontStyle: 'bold',
         color: '#f4f4f5'
@@ -1003,10 +967,150 @@ export class UIScene extends Phaser.Scene {
       modalContainer.destroy();
     };
 
-    closeBtn.on('pointerdown', closeModal);
-    backdrop.on('pointerdown', closeModal);
+    closeBtn.on('pointerup', closeModal);
+    backdrop.on('pointerup', closeModal);
 
     modalContainer.add([backdrop, boxBg, innerBorder, title, contentText, closeBtn, closeText]);
+  }
+
+  public showBrigadistaBaseModal(): void {
+    if (!this.gameScene) return;
+    this.gameScene.isStoryModalOpen = true;
+
+    const modalContainer = this.add.container(0, 0).setDepth(201);
+
+    const backdrop = this.add
+      .rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.82)
+      .setInteractive();
+
+    const boxW = 630;
+    const boxH = 240;
+    const boxX = GAME_WIDTH / 2;
+    const boxY = GAME_HEIGHT / 2;
+
+    const boxBg = this.add
+      .rectangle(boxX, boxY, boxW, boxH, 0x090d0a, 0.98)
+      .setStrokeStyle(2.5, 0xfacc15);
+
+    const innerBorder = this.add
+      .rectangle(boxX, boxY, boxW - 10, boxH - 10, 0x000000, 0)
+      .setStrokeStyle(1, 0x15803d);
+
+    const title = this.add
+      .text(boxX, boxY - boxH / 2 + 28, 'BASE DOS BRIGADISTAS', {
+        fontSize: '13px',
+        fontStyle: 'bold',
+        color: '#fde047'
+      })
+      .setOrigin(0.5);
+
+    const count = this.gameScene.getBrigadistaCount();
+    const limit = this.gameScene.getBrigadistaLimit();
+    const limitReached = count >= limit;
+    const remainingMs = this.gameScene.getBrigadistaBaseCooldownRemainingMs();
+    const onCooldown = remainingMs > 0;
+
+    const infoText = this.add
+      .text(
+        boxX,
+        boxY - 40,
+        this.gameScene.phaseSystem.isAjusteFiscalActive()
+          ? 'Durante o Ajuste Fiscal, a base forma no máximo 3 brigadistas. A base forma um novo brigadista a cada 2 minutos.'
+          : 'A base forma um novo brigadista a cada 2 minutos, até o limite de brigadistas.',
+        {
+          fontSize: '12px',
+          color: '#f4f4f5',
+          align: 'center',
+          lineSpacing: 5,
+          wordWrap: { width: boxW - 60 }
+        }
+      )
+      .setOrigin(0.5);
+
+    const countText = this.add
+      .text(boxX, boxY + 4, `Brigadistas: ${count}/${limit}`, {
+        fontSize: '12px',
+        fontStyle: 'bold',
+        color: '#f4f4f5'
+      })
+      .setOrigin(0.5);
+
+    let statusLabel: string;
+    if (limitReached) {
+      statusLabel = 'Limite de brigadistas atingido';
+    } else if (onCooldown) {
+      const remainingSec = Math.ceil(remainingMs / 1000);
+      statusLabel = `Próximo brigadista em ${Math.floor(remainingSec / 60)}:${String(remainingSec % 60).padStart(2, '0')}`;
+    } else {
+      statusLabel = 'Pronto para formar um brigadista';
+    }
+    const canRecruit = !limitReached && !onCooldown;
+
+    const statusText = this.add
+      .text(boxX, boxY + 26, statusLabel, {
+        fontSize: '11px',
+        fontStyle: 'bold',
+        color: canRecruit ? '#86efac' : '#fca5a5'
+      })
+      .setOrigin(0.5);
+
+    const btnY = boxY + boxH / 2 - 32;
+
+    const recruitBtn = this.add
+      .rectangle(boxX - 110, btnY, 260, 38, canRecruit ? 0x9a3412 : 0x3f3f46, 1)
+      .setStrokeStyle(2, canRecruit ? 0xfdba74 : 0x71717a);
+    if (canRecruit) recruitBtn.setInteractive({ useHandCursor: true });
+
+    const recruitText = this.add
+      .text(boxX - 110, btnY, '🧯 Formar brigadista', {
+        fontSize: '12px',
+        fontStyle: 'bold',
+        color: canRecruit ? '#fff7ed' : '#a1a1aa'
+      })
+      .setOrigin(0.5);
+
+    const closeBtn = this.add
+      .rectangle(boxX + 150, btnY, 120, 38, 0x27272a, 1)
+      .setStrokeStyle(2, 0x71717a)
+      .setInteractive({ useHandCursor: true });
+
+    const closeText = this.add
+      .text(boxX + 150, btnY, 'Fechar', {
+        fontSize: '12px',
+        fontStyle: 'bold',
+        color: '#f4f4f5'
+      })
+      .setOrigin(0.5);
+
+    const closeModal = () => {
+      SoundManager.unlock();
+      if (this.gameScene) {
+        this.gameScene.isStoryModalOpen = false;
+      }
+      modalContainer.destroy();
+    };
+
+    recruitBtn.on('pointerup', () => {
+      if (this.gameScene.tryRecruitBrigadista()) {
+        closeModal();
+      }
+    });
+    closeBtn.on('pointerup', closeModal);
+    backdrop.on('pointerup', closeModal);
+
+    modalContainer.add([
+      backdrop,
+      boxBg,
+      innerBorder,
+      title,
+      infoText,
+      countText,
+      statusText,
+      recruitBtn,
+      recruitText,
+      closeBtn,
+      closeText
+    ]);
   }
 
   public showHouseDonationPanel(houseId: number): void {
@@ -1034,7 +1138,6 @@ export class UIScene extends Phaser.Scene {
 
     const title = this.add
       .text(boxX, boxY - boxH / 2 + 28, 'CASA DE MORADOR', {
-        fontFamily: 'Courier New, monospace',
         fontSize: '13px',
         fontStyle: 'bold',
         color: '#fde047'
@@ -1051,7 +1154,6 @@ export class UIScene extends Phaser.Scene {
           ? 'Os brigadistas agradecem muito, mas não estão mais aceitando doações porque não possuem pessoal nem estrutura para a quantidade de doações recebidas.'
           : 'Esta casa pode enviar uma doação a cada 2 minutos. Cada doação aumenta a Consciência de Classe e devolve energia aos brigadistas.',
         {
-          fontFamily: 'Courier New, monospace',
           fontSize: '12px',
           color: '#f4f4f5',
           align: 'center',
@@ -1072,7 +1174,6 @@ export class UIScene extends Phaser.Scene {
 
     const statusText = this.add
       .text(boxX, boxY + 38, statusLabel, {
-        fontFamily: 'Courier New, monospace',
         fontSize: '11px',
         fontStyle: 'bold',
         color: onCooldown || donationBlocked ? '#fca5a5' : '#86efac'
@@ -1089,7 +1190,6 @@ export class UIScene extends Phaser.Scene {
 
     const donateText = this.add
       .text(boxX - 70, btnY, 'Enviar doação para brigadistas', {
-        fontFamily: 'Courier New, monospace',
         fontSize: '12px',
         fontStyle: 'bold',
         color: cannotDonate ? '#a1a1aa' : '#052e16'
@@ -1103,7 +1203,6 @@ export class UIScene extends Phaser.Scene {
 
     const closeText = this.add
       .text(boxX + 180, btnY, 'Fechar', {
-        fontFamily: 'Courier New, monospace',
         fontSize: '12px',
         fontStyle: 'bold',
         color: '#f4f4f5'
@@ -1118,15 +1217,15 @@ export class UIScene extends Phaser.Scene {
       modalContainer.destroy();
     };
 
-    donateBtn.on('pointerdown', () => {
+    donateBtn.on('pointerup', () => {
       if (this.gameScene.donateFromHouse(houseId)) {
         SoundManager.unlock();
         SoundManager.playPhaseUp();
         closeModal();
       }
     });
-    closeBtn.on('pointerdown', closeModal);
-    backdrop.on('pointerdown', closeModal);
+    closeBtn.on('pointerup', closeModal);
+    backdrop.on('pointerup', closeModal);
 
     modalContainer.add([
       backdrop,
@@ -1198,24 +1297,6 @@ export class UIScene extends Phaser.Scene {
         const ratio = this.gameScene.sectorSystem.getCooldownRemainingRatio(type);
         btn.cooldownOverlay.width = btn.width * ratio;
         btn.rect.setStrokeStyle(ratio <= 0 ? 2 : 1, ratio <= 0 ? 0x4ade80 : 0x52525b);
-      }
-    }
-
-    const brigBtn = this.defenseButtons.get('RECRUIT_BRIGADISTA');
-    if (brigBtn) {
-      const unlocked = this.gameScene.phaseSystem.isBrigadaComunitariaUnlocked();
-      const count = this.gameScene.getBrigadistaCount();
-      brigBtn.titleText.setText(`🧯 BRIGADA(${count}/${BALANCE.MAX_BRIGADISTAS})`);
-      if (!unlocked) {
-        brigBtn.subText.setText('🔒 Requer 20%');
-        brigBtn.cooldownOverlay.width = brigBtn.width;
-      } else if (count >= BALANCE.MAX_BRIGADISTAS) {
-        brigBtn.subText.setText('Limite Máx.');
-        brigBtn.cooldownOverlay.width = brigBtn.width;
-      } else {
-        brigBtn.subText.setText('Invocar Esquadrão');
-        const ratio = this.gameScene.getBrigadistaRecruitCooldownRatio();
-        brigBtn.cooldownOverlay.width = brigBtn.width * ratio;
       }
     }
 

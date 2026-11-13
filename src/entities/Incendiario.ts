@@ -8,6 +8,7 @@ import {
   getIsoDistance
 } from '../config/GameBalance';
 import { FireSmokeSystem } from '../systems/FireSmokeSystem';
+import { createNavRoute, getCollisionSystem, NavRoute } from '../systems/CollisionSystem';
 
 /**
  * Os Incendiários (Agentes do Caos):
@@ -34,6 +35,7 @@ export class Incendiario extends Phaser.Events.EventEmitter {
   private igniteWarmupMs = 1500;
   private alive = true;
   private isFollowed = false;
+  private navRoute: NavRoute = createNavRoute();
 
   constructor(
     scene: Phaser.Scene,
@@ -48,12 +50,17 @@ export class Incendiario extends Phaser.Events.EventEmitter {
     this.id = id;
     this.x = spawnX;
     this.y = spawnY;
-    this.targetX = targetX;
-    this.targetY = targetY;
+    const collision = getCollisionSystem(scene);
+    const blindSpot = collision.snapToFree(targetX, targetY);
+    this.targetX = blindSpot.x;
+    this.targetY = blindSpot.y;
 
     const escapeAngle = Math.atan2((spawnY - WORLD_CENTER_Y) * ISO_INVERSE_Y_RATIO, spawnX - WORLD_CENTER_X);
-    this.escapeX = WORLD_CENTER_X + Math.cos(escapeAngle) * (FLORESTA_OUTER_RADIUS + 50);
-    this.escapeY = WORLD_CENTER_Y + Math.sin(escapeAngle) * ((FLORESTA_OUTER_RADIUS + 50) * ISO_Y_RATIO);
+    const escapeRawX = WORLD_CENTER_X + Math.cos(escapeAngle) * (FLORESTA_OUTER_RADIUS + 50);
+    const escapeRawY = WORLD_CENTER_Y + Math.sin(escapeAngle) * ((FLORESTA_OUTER_RADIUS + 50) * ISO_Y_RATIO);
+    const escape = collision.snapToFree(escapeRawX, escapeRawY);
+    this.escapeX = escape.x;
+    this.escapeY = escape.y;
 
     this.shadowSprite = scene.add.sprite(spawnX, spawnY, 'unit_shadow').setOrigin(0.5, 0.5).setDepth(18);
 
@@ -67,7 +74,6 @@ export class Incendiario extends Phaser.Events.EventEmitter {
 
     this.alertBadge = scene.add
       .text(spawnX, spawnY - 26, '!', {
-        fontFamily: 'Courier New, monospace',
         fontSize: '13px',
         fontStyle: 'bold',
         color: '#fef08a',
@@ -119,6 +125,24 @@ export class Incendiario extends Phaser.Events.EventEmitter {
     return this.alive;
   }
 
+  /** Move-se em direção ao objetivo sem atravessar obstáculos */
+  private advance(goalX: number, goalY: number, stepLen: number): void {
+    const prevX = this.x;
+    const next = getCollisionSystem(this.scene).navigate(
+      this.x,
+      this.y,
+      goalX,
+      goalY,
+      this.navRoute,
+      stepLen
+    );
+    this.x = next.x;
+    this.y = next.y;
+    if (Math.abs(this.x - prevX) > 0.05) {
+      this.sprite.setFlipX(this.x < prevX);
+    }
+  }
+
   public update(deltaMs: number, fireSystem: FireSmokeSystem): void {
     if (!this.alive) return;
     const dtSec = deltaMs / 1000;
@@ -126,13 +150,7 @@ export class Incendiario extends Phaser.Events.EventEmitter {
     if (!this.hasIgnited) {
       const dist = getIsoDistance(this.x, this.y, this.targetX, this.targetY);
       if (dist > 6) {
-        const groundAngle = Math.atan2(
-          (this.targetY - this.y) * ISO_INVERSE_Y_RATIO,
-          this.targetX - this.x
-        );
-        this.x += Math.cos(groundAngle) * this.speed * dtSec;
-        this.y += Math.sin(groundAngle) * this.speed * dtSec * ISO_Y_RATIO;
-        this.sprite.setFlipX(Math.cos(groundAngle) < 0);
+        this.advance(this.targetX, this.targetY, this.speed * dtSec);
       } else {
         // Ateando fogo no ponto cego
         this.igniteWarmupMs -= deltaMs;
@@ -150,13 +168,7 @@ export class Incendiario extends Phaser.Events.EventEmitter {
         this.destroy();
         return;
       }
-      const groundAngle = Math.atan2(
-        (this.escapeY - this.y) * ISO_INVERSE_Y_RATIO,
-        this.escapeX - this.x
-      );
-      this.x += Math.cos(groundAngle) * this.escapeSpeed * dtSec;
-      this.y += Math.sin(groundAngle) * this.escapeSpeed * dtSec * ISO_Y_RATIO;
-      this.sprite.setFlipX(Math.cos(groundAngle) < 0);
+      this.advance(this.escapeX, this.escapeY, this.escapeSpeed * dtSec);
     }
 
     const yDepth = 20 + Math.floor(this.y);
@@ -168,9 +180,6 @@ export class Incendiario extends Phaser.Events.EventEmitter {
   }
 
   public destroy(): void {
-    if (!this.alive) return;
-    this.alive = false;
-    this.selectionRing.destroy();
     this.sprite.destroy();
     this.shadowSprite.destroy();
     this.alertBadge.destroy();

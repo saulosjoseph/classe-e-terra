@@ -12,6 +12,7 @@ import {
   getIsoSquareDist
 } from '../config/GameBalance';
 import { UnitType } from '../types/GameTypes';
+import { createNavRoute, getCollisionSystem, NavRoute } from '../systems/CollisionSystem';
 
 export abstract class Unit extends Phaser.Events.EventEmitter {
   public readonly id: string;
@@ -33,6 +34,7 @@ export abstract class Unit extends Phaser.Events.EventEmitter {
   protected equipmentBoostUntil = 0;
   protected patrolAngle = 0;
   protected statusBarOffsetY = 28;
+  protected navRoute: NavRoute = createNavRoute();
 
   constructor(
     scene: Phaser.Scene,
@@ -126,8 +128,9 @@ export abstract class Unit extends Phaser.Events.EventEmitter {
       clampedY = Math.round(WORLD_CENTER_Y + (clampedY - WORLD_CENTER_Y) * factor);
     }
 
-    this.targetX = clampedX;
-    this.targetY = clampedY;
+    const free = getCollisionSystem(this.scene).snapToFree(clampedX, clampedY);
+    this.targetX = free.x;
+    this.targetY = free.y;
   }
 
   public setStamina(value: number): void {
@@ -176,18 +179,22 @@ export abstract class Unit extends Phaser.Events.EventEmitter {
       speed *= 0.58;
     }
 
-    // Ângulo e passo no plano do solo isométrico
-    const groundAngle = Math.atan2(
-      (this.targetY - this.y) * ISO_INVERSE_Y_RATIO,
-      this.targetX - this.x
+    // Movimento no plano do solo, contornando obstáculos (casas, prefeitura, árvores e roçados)
+    const prevX = this.x;
+    const next = getCollisionSystem(this.scene).navigate(
+      this.x,
+      this.y,
+      this.targetX,
+      this.targetY,
+      this.navRoute,
+      speed * dtSec
     );
-    const step = Math.min(dist, speed * dtSec);
-    this.x += Math.cos(groundAngle) * step;
-    this.y += Math.sin(groundAngle) * step * ISO_Y_RATIO;
+    this.x = next.x;
+    this.y = next.y;
 
-    // Flip horizontal em 3/4 conforme direção
-    if (Math.abs(this.targetX - this.x) > 2) {
-      this.sprite.setFlipX(this.targetX < this.x);
+    // Flip horizontal em 3/4 conforme direção do deslocamento
+    if (Math.abs(this.x - prevX) > 0.05) {
+      this.sprite.setFlipX(this.x < prevX);
     }
 
     const yDepth = 20 + Math.floor(this.y);

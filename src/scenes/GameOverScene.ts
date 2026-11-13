@@ -30,7 +30,6 @@ export class GameOverScene extends Phaser.Scene {
 
     this.add
       .text(GAME_WIDTH / 2, 42, badge, {
-        fontFamily: 'Courier New, monospace',
         fontSize: '26px',
         fontStyle: 'bold',
         color: titleColor,
@@ -41,7 +40,6 @@ export class GameOverScene extends Phaser.Scene {
 
     this.add
       .text(GAME_WIDTH / 2, 82, stats.reason, {
-        fontFamily: 'Courier New, monospace',
         fontSize: '12px',
         color: '#f4f4f5',
         align: 'center',
@@ -66,7 +64,6 @@ export class GameOverScene extends Phaser.Scene {
 
     this.add
       .text(panel.x, panel.y, reportLines.join('\n'), {
-        fontFamily: 'Courier New, monospace',
         fontSize: '13px',
         fontStyle: 'bold',
         color: '#e2e8f0',
@@ -82,7 +79,6 @@ export class GameOverScene extends Phaser.Scene {
 
     this.add
       .text(575, 198, '🔄 JOGAR NOVAMENTE', {
-        fontFamily: 'Courier New, monospace',
         fontSize: '15px',
         fontStyle: 'bold',
         color: '#052e16'
@@ -101,7 +97,6 @@ export class GameOverScene extends Phaser.Scene {
 
     this.add
       .text(575, 272, '⚙️ MENU / DIFICULDADE', {
-        fontFamily: 'Courier New, monospace',
         fontSize: '13px',
         fontStyle: 'bold',
         color: '#f4f4f5'
@@ -115,7 +110,6 @@ export class GameOverScene extends Phaser.Scene {
 
     const fullscreenBtn = this.add
       .text(575, 336, this.getFullscreenLabel(), {
-        fontFamily: 'Courier New, monospace',
         fontSize: '11px',
         fontStyle: 'bold',
         color: '#a1a1aa',
