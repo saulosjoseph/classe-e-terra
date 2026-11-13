@@ -93,12 +93,14 @@ export class UIScene extends Phaser.Scene {
     this.gameScene.events.on('prefeitura-clicked', this.showPrefeituraInfoModal, this);
     this.gameScene.events.on('house-clicked', this.showHouseDonationPanel, this);
     this.gameScene.events.on('brigadista-base-clicked', this.showBrigadistaBaseModal, this);
+    this.gameScene.events.on('aldeia-clicked', this.showAldeiaInfoModal, this);
     this.events.once('shutdown', () => {
       this.gameScene.events.off('show-donation-info', this.showDonationInfoModal, this);
       this.gameScene.events.off('show-trabalhador-info', this.showTrabalhadorInfoModal, this);
       this.gameScene.events.off('prefeitura-clicked', this.showPrefeituraInfoModal, this);
       this.gameScene.events.off('house-clicked', this.showHouseDonationPanel, this);
       this.gameScene.events.off('brigadista-base-clicked', this.showBrigadistaBaseModal, this);
+      this.gameScene.events.off('aldeia-clicked', this.showAldeiaInfoModal, this);
     });
 
     this.gameScene.phaseSystem.on(
@@ -899,11 +901,22 @@ export class UIScene extends Phaser.Scene {
   }
 
   public showPrefeituraInfoModal(): void {
+    this.openInfoModal(
+      'PREFEITURA',
+      'A prefeitura possui necessidades legais para atuar dentro da ordem. Ela responderá ao pedido dos trabalhadores rurais em um prazo de 15 dias.\n\nMas o governo federal pode ajudar.'
+    );
+  }
+
+  public showAldeiaInfoModal(): void {
+    this.openInfoModal(
+      'Aldeia',
+      'A aldeia guarda saberes e o território que mantém a floresta de pé. Proteger seus territórios é proteger a própria floresta.'
+    );
+  }
+
+  private openInfoModal(headerText: string, infoText: string): void {
     if (!this.gameScene) return;
     this.gameScene.isStoryModalOpen = true;
-
-    const infoText =
-      'A prefeitura possui necessidades legais para atuar dentro da ordem. Ela responderá ao pedido dos trabalhadores rurais em um prazo de 15 dias.\n\nMas o governo federal pode ajudar.';
 
     const modalContainer = this.add.container(0, 0).setDepth(201);
 
@@ -925,7 +938,7 @@ export class UIScene extends Phaser.Scene {
       .setStrokeStyle(1, 0x15803d);
 
     const title = this.add
-      .text(boxX, boxY - boxH / 2 + 28, 'PREFEITURA', {
+      .text(boxX, boxY - boxH / 2 + 28, headerText, {
         fontSize: '13px',
         fontStyle: 'bold',
         color: '#fde047'

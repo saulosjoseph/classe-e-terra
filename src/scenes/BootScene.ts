@@ -9,6 +9,7 @@ export class BootScene extends Phaser.Scene {
   public preload(): void {
     this.load.image('prefeitura', 'assets/prefeitura.png');
     this.load.image('base_brigadista_voluntario', 'assets/base_brigadista_voluntario.png');
+    this.load.image('aldeia', 'assets/aldeia.png');
     this.load.spritesheet('brigadista_voluntario', 'assets/brigadista_voluntario.png', {
       frameWidth: 128,
       frameHeight: 128

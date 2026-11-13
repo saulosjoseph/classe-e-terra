@@ -1,5 +1,7 @@
 import Phaser from 'phaser';
 import {
+  ALDEIA,
+  ALDEIA_POSITIONS,
   BALANCE,
   BASE_BRIGADISTA_X,
   BASE_BRIGADISTA_Y,
@@ -1092,12 +1094,30 @@ export class GameScene extends Phaser.Scene {
     });
     getCollisionSystem(this).addObstacle(baseX, baseY, COLLISION.BASE_BRIGADISTA_RADIUS);
 
+    // Aldeias indígenas nos 4 cantos do losango da floresta (clicáveis, abrem informações)
+    for (const pos of ALDEIA_POSITIONS) {
+      const aldeiaSprite = this.add
+        .sprite(pos.x, pos.y, 'aldeia')
+        .setOrigin(0.5, 0.5);
+      aldeiaSprite.setDepth(15 + Math.floor(pos.y));
+      aldeiaSprite.setInteractive({ useHandCursor: true });
+      aldeiaSprite.on('pointerup', (pointer: Phaser.Input.Pointer) => {
+        // Arrastar o mapa não conta como toque na aldeia
+        if (pointer.getDistance() > 10) return;
+        this.onAldeiaClicked();
+      });
+      getCollisionSystem(this).addObstacle(pos.x, pos.y, COLLISION.ALDEIA_RADIUS);
+    }
+
     // Props da FLORESTA QUADRADA ISOMÉTRICA (Samaúmas e Castanheiras)
     // Clareira ao redor da sede: nenhuma árvore nasce sobre o prédio
     const baseClearing = 260;
     for (let i = 0; i < 200; i++) {
       let pt = getRandomPointInSector(SectorType.FLORESTA, 40);
-      while (getIsoDistance(pt.x, pt.y, baseX, baseY) < baseClearing) {
+      while (
+        getIsoDistance(pt.x, pt.y, baseX, baseY) < baseClearing ||
+        ALDEIA_POSITIONS.some((pos) => getIsoDistance(pt.x, pt.y, pos.x, pos.y) < ALDEIA.CLEARING)
+      ) {
         pt = getRandomPointInSector(SectorType.FLORESTA, 40);
       }
       const sprite = this.add
@@ -1356,6 +1376,15 @@ export class GameScene extends Phaser.Scene {
     this.clearHouseFocus();
     this.clearPrefeituraFocus();
     this.events.emit('brigadista-base-clicked');
+  }
+
+  private onAldeiaClicked(): void {
+    if (this.isEnding || this.isStoryModalOpen) return;
+    SoundManager.unlock();
+    SoundManager.playSelect();
+    this.clearHouseFocus();
+    this.clearPrefeituraFocus();
+    this.events.emit('aldeia-clicked');
   }
 
   public getBrigadistaLimit(): number {

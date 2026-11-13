@@ -48,7 +48,8 @@ export const COLLISION = {
   PREFEITURA_RADIUS: 75,
   TREE_RADIUS: 27,
   FARM_RADIUS: 12,
-  BASE_BRIGADISTA_RADIUS: 110
+  BASE_BRIGADISTA_RADIUS: 110,
+  ALDEIA_RADIUS: 150
 } as const;
 
 /**
@@ -71,6 +72,21 @@ export const FLORESTA_OUTER_RADIUS_Y = FLORESTA_OUTER_RADIUS * ISO_Y_RATIO; // 1
 /** Sede dos Brigadistas Voluntários, no anel da Floresta (noroeste) */
 export const BASE_BRIGADISTA_X = WORLD_CENTER_X - 2200;
 export const BASE_BRIGADISTA_Y = WORLD_CENTER_Y - 600;
+
+/** Aldeias indígenas: largura em px do mundo, recuo para dentro de cada vértice do losango e clareira de árvores */
+export const ALDEIA = {
+  WIDTH: 500,
+  EDGE_INSET: 350,
+  CLEARING: 260
+} as const;
+
+/** Uma aldeia em cada canto do losango da floresta (topo, direita, base e esquerda), recuada para dentro */
+export const ALDEIA_POSITIONS: ReadonlyArray<{ x: number; y: number }> = [
+  { x: WORLD_CENTER_X, y: WORLD_CENTER_Y - FLORESTA_OUTER_RADIUS_Y + ALDEIA.EDGE_INSET },
+  { x: WORLD_CENTER_X + FLORESTA_OUTER_RADIUS - ALDEIA.EDGE_INSET, y: WORLD_CENTER_Y },
+  { x: WORLD_CENTER_X, y: WORLD_CENTER_Y + FLORESTA_OUTER_RADIUS_Y - ALDEIA.EDGE_INSET },
+  { x: WORLD_CENTER_X - FLORESTA_OUTER_RADIUS + ALDEIA.EDGE_INSET, y: WORLD_CENTER_Y }
+];
 
 export const SECTOR_INFO: Record<
   SectorType,
@@ -259,7 +275,7 @@ export const POLITICAL_PHASES: PoliticalPhaseDefinition[] = [
 ];
 
 export const BALANCE = {
-  INITIAL_FOREST_HEALTH: 500,
+  INITIAL_FOREST_HEALTH: 2000,
   INITIAL_CONSCIOUSNESS: 0,
   MAX_CONSCIOUSNESS: 100,
   /** Cooldowns base em milissegundos */
