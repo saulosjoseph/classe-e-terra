@@ -5,6 +5,8 @@ import {
   BALANCE,
   BASE_BRIGADISTA_X,
   BASE_BRIGADISTA_Y,
+  BASE_BOMBEIROS_X,
+  BASE_BOMBEIROS_Y,
   CAMPO_RADIUS,
   CAMPO_RADIUS_Y,
   CITY_RADIUS,
@@ -956,6 +958,11 @@ export class GameScene extends Phaser.Scene {
           continue;
         }
 
+        // Quarteirão da Base dos Bombeiros (borda noroeste da cidade)
+        if (i === -4 && j === 0) {
+          continue;
+        }
+
         // Quadra dupla central ((-1, 0) + (0, 0)): Palácio Municipal (Prefeitura) ocupando os 2 quarteirões somados
         if (i === 0 && j === 0) {
           const mergedUc = 0; // Centro entre os quarteirões i = -1 e i = 0
@@ -1093,6 +1100,19 @@ export class GameScene extends Phaser.Scene {
       this.onBrigadistaBaseClicked();
     });
     getCollisionSystem(this).addObstacle(baseX, baseY, COLLISION.BASE_BRIGADISTA_RADIUS);
+
+    // Base dos Bombeiros na borda noroeste da cidade (decorativa, clicável para informações)
+    const bombeirosSprite = this.add
+      .sprite(BASE_BOMBEIROS_X, BASE_BOMBEIROS_Y, 'base_bombeiros')
+      .setOrigin(0.5, 0.75)
+      .setScale(380 / 1156);
+    bombeirosSprite.setDepth(15 + Math.floor(BASE_BOMBEIROS_Y + bombeirosSprite.displayHeight * 0.25));
+    bombeirosSprite.setInteractive({ useHandCursor: true });
+    bombeirosSprite.on('pointerup', (pointer: Phaser.Input.Pointer) => {
+      if (pointer.getDistance() > 10) return;
+      this.onBombeirosBaseClicked();
+    });
+    getCollisionSystem(this).addObstacle(BASE_BOMBEIROS_X, BASE_BOMBEIROS_Y, COLLISION.BASE_BOMBEIROS_RADIUS);
 
     // Aldeias indígenas nos 4 cantos do losango da floresta (clicáveis, abrem informações)
     for (const pos of ALDEIA_POSITIONS) {
@@ -1376,6 +1396,15 @@ export class GameScene extends Phaser.Scene {
     this.clearHouseFocus();
     this.clearPrefeituraFocus();
     this.events.emit('brigadista-base-clicked');
+  }
+
+  private onBombeirosBaseClicked(): void {
+    if (this.isEnding || this.isStoryModalOpen) return;
+    SoundManager.unlock();
+    SoundManager.playSelect();
+    this.clearHouseFocus();
+    this.clearPrefeituraFocus();
+    this.events.emit('bombeiros-base-clicked');
   }
 
   private onAldeiaClicked(): void {

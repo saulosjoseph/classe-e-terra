@@ -49,6 +49,7 @@ export const COLLISION = {
   TREE_RADIUS: 27,
   FARM_RADIUS: 12,
   BASE_BRIGADISTA_RADIUS: 110,
+  BASE_BOMBEIROS_RADIUS: 110,
   ALDEIA_RADIUS: 150
 } as const;
 
@@ -72,6 +73,10 @@ export const FLORESTA_OUTER_RADIUS_Y = FLORESTA_OUTER_RADIUS * ISO_Y_RATIO; // 1
 /** Sede dos Brigadistas Voluntários, no anel da Floresta (noroeste) */
 export const BASE_BRIGADISTA_X = WORLD_CENTER_X - 2200;
 export const BASE_BRIGADISTA_Y = WORLD_CENTER_Y - 600;
+
+/** Base dos Bombeiros: lote externo da borda noroeste da cidade (bloco i=-4, j=0), decorativa e clicável */
+export const BASE_BOMBEIROS_X = WORLD_CENTER_X - 960;
+export const BASE_BOMBEIROS_Y = WORLD_CENTER_Y - 360;
 
 /** Aldeias indígenas: largura em px do mundo, recuo para dentro de cada vértice do losango e clareira de árvores */
 export const ALDEIA = {
@@ -275,7 +280,7 @@ export const POLITICAL_PHASES: PoliticalPhaseDefinition[] = [
 ];
 
 export const BALANCE = {
-  INITIAL_FOREST_HEALTH: 10000,
+  INITIAL_FOREST_HEALTH: 50000,
   INITIAL_CONSCIOUSNESS: 0,
   MAX_CONSCIOUSNESS: 100,
   /** Cooldowns base em milissegundos */

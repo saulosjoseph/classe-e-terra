@@ -94,6 +94,7 @@ export class UIScene extends Phaser.Scene {
     this.gameScene.events.on('house-clicked', this.showHouseDonationPanel, this);
     this.gameScene.events.on('brigadista-base-clicked', this.showBrigadistaBaseModal, this);
     this.gameScene.events.on('aldeia-clicked', this.showAldeiaInfoModal, this);
+    this.gameScene.events.on('bombeiros-base-clicked', this.showBombeirosBaseInfoModal, this);
     this.events.once('shutdown', () => {
       this.gameScene.events.off('show-donation-info', this.showDonationInfoModal, this);
       this.gameScene.events.off('show-trabalhador-info', this.showTrabalhadorInfoModal, this);
@@ -101,6 +102,7 @@ export class UIScene extends Phaser.Scene {
       this.gameScene.events.off('house-clicked', this.showHouseDonationPanel, this);
       this.gameScene.events.off('brigadista-base-clicked', this.showBrigadistaBaseModal, this);
       this.gameScene.events.off('aldeia-clicked', this.showAldeiaInfoModal, this);
+      this.gameScene.events.off('bombeiros-base-clicked', this.showBombeirosBaseInfoModal, this);
     });
 
     this.gameScene.phaseSystem.on(
@@ -911,6 +913,13 @@ export class UIScene extends Phaser.Scene {
     this.openInfoModal(
       'Aldeia',
       'A aldeia guarda saberes e o território que mantém a floresta de pé. Proteger seus territórios é proteger a própria floresta.'
+    );
+  }
+
+  public showBombeirosBaseInfoModal(): void {
+    this.openInfoModal(
+      'Base dos Bombeiros',
+      'Os bombeiros ficam na borda da cidade, de olho na floresta. Quando o fogo se aproxima, a equipe precisa de estrutura, treinamento e apoio para agir rápido.'
     );
   }
 
