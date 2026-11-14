@@ -17,6 +17,9 @@ import {
 import { FireNodeData, SectorType } from '../types/GameTypes';
 import { SoundManager } from '../audio/SoundManager';
 
+/** Profundidade única das barras de intensidade: uma só camada para todos os focos */
+const FIRE_BARS_DEPTH = 9000;
+
 /** Escalas aplicadas às texturas de marca de queimada (assadas no Blitter, pois bobs não têm escala) */
 const SCORCH_GROUND_SCALE = 0.45;
 const SCORCH_SMOKE_SCALE = 0.9;
@@ -30,9 +33,10 @@ export interface ActiveFireInstance {
   data: FireNodeData;
   fireSprite: Phaser.GameObjects.Sprite;
   smokeSprite: Phaser.GameObjects.Sprite;
-  ringGraphics: Phaser.GameObjects.Graphics;
+  /** Halo de fumaça pré-renderizado por nível (textura fixa, sem triangulação por frame) */
+  haloSprite: Phaser.GameObjects.Image;
   hitZone: Phaser.GameObjects.Zone;
-  /** Último estado desenhado em ringGraphics (nível de fumaça + intensidade inteira) */
+  /** Último estado visível das barras (nível de fumaça + intensidade inteira) */
   ringStateKey: number;
 }
 
@@ -57,6 +61,8 @@ export class FireSmokeSystem extends Phaser.Events.EventEmitter {
   private scorchSmokeBlitter: Phaser.GameObjects.Blitter | null = null;
   private scorchGroundSize = { w: 0, h: 0 };
   private scorchSmokeSize = { w: 0, h: 0 };
+  private barsGraphics: Phaser.GameObjects.Graphics | null = null;
+  private barsDirty = false;
 
   constructor(scene: Phaser.Scene) {
     super();
@@ -121,7 +127,10 @@ export class FireSmokeSystem extends Phaser.Events.EventEmitter {
       .setDepth(yDepth)
       .setScale(0.95);
 
-    const ringGraphics = this.scene.add.graphics().setDepth(16 + Math.floor(clampedY));
+    this.ensureHaloTextures();
+    const haloSprite = this.scene.add
+      .image(clampedX, clampedY, 'fire_halo_1')
+      .setDepth(16 + Math.floor(clampedY));
 
     const hitZone = this.scene.add
       .zone(clampedX, clampedY, 56, 56)
@@ -145,7 +154,7 @@ export class FireSmokeSystem extends Phaser.Events.EventEmitter {
       data,
       fireSprite,
       smokeSprite,
-      ringGraphics,
+      haloSprite,
       hitZone,
       ringStateKey: -1
     };
@@ -157,6 +166,7 @@ export class FireSmokeSystem extends Phaser.Events.EventEmitter {
     });
 
     this.fires.set(id, instance);
+    this.barsDirty = true;
     SoundManager.playFireStart();
     this.updateFireVisuals(instance);
     return instance;
@@ -226,9 +236,10 @@ export class FireSmokeSystem extends Phaser.Events.EventEmitter {
     if (inst.data.intensity <= 0) {
       inst.fireSprite.destroy();
       inst.smokeSprite.destroy();
-      inst.ringGraphics.destroy();
+      inst.haloSprite.destroy();
       inst.hitZone.destroy();
       this.fires.delete(id);
+      this.barsDirty = true;
       SoundManager.playExtinguish();
       this.emit('fire-extinguished', inst.data);
       return true;
@@ -404,6 +415,10 @@ export class FireSmokeSystem extends Phaser.Events.EventEmitter {
       }
     }
 
+    if (this.barsDirty) {
+      this.drawBars();
+    }
+
     return { forestDamage: totalForestDamage };
   }
 
@@ -422,32 +437,57 @@ export class FireSmokeSystem extends Phaser.Events.EventEmitter {
     inst.smokeSprite.setScale(1.2 + inst.data.smokeLevel * 0.52);
     inst.smokeSprite.setPosition(inst.data.x, inst.data.y - 22).setDepth(yDepth + 5);
 
+    const haloKey = `fire_halo_${inst.data.smokeLevel}`;
+    if (inst.haloSprite.texture.key !== haloKey) {
+      inst.haloSprite.setTexture(haloKey);
+    }
+
     const ringStateKey = inst.data.smokeLevel * 1000 + Math.round(inst.data.intensity);
     if (ringStateKey !== inst.ringStateKey) {
       inst.ringStateKey = ringStateKey;
-      this.drawFireRing(inst);
+      this.barsDirty = true;
     }
   }
 
-  /** Redesenha o halo de fumaça e a barra de intensidade; chamado só quando o estado visível muda */
-  private drawFireRing(inst: ActiveFireInstance): void {
-    const smokeCfg = SMOKE_PALETTE[inst.data.smokeLevel];
-    inst.ringGraphics.clear();
-    inst.ringGraphics.setDepth(16 + Math.floor(inst.data.y));
-    const smokeRadius = 24 + inst.data.smokeLevel * 14;
-    inst.ringGraphics.fillStyle(smokeCfg.color, smokeCfg.alpha * 0.42);
-    inst.ringGraphics.fillEllipse(inst.data.x, inst.data.y, smokeRadius * 2, smokeRadius, 24);
+  /** Halos de fumaça prontos, um por nível, com a cor e a opacidade do nível já aplicadas */
+  private ensureHaloTextures(): void {
+    for (const level of [1, 2, 3, 4] as const) {
+      const key = `fire_halo_${level}`;
+      if (this.scene.textures.exists(key)) continue;
+
+      const cfg = SMOKE_PALETTE[level];
+      const radius = 24 + level * 14;
+      const w = radius * 2 + 4;
+      const h = radius + 4;
+      const g = this.scene.make.graphics({}, false);
+      g.fillStyle(cfg.color, cfg.alpha * 0.42);
+      g.fillEllipse(w / 2, h / 2, radius * 2, radius, 24);
+      g.generateTexture(key, w, h);
+      g.destroy();
+    }
+  }
+
+  /**
+   * Redesenha as barras de intensidade de todos os focos numa única camada.
+   * Um Graphics por foco custaria um objeto renderizado a cada frame por foco.
+   */
+  private drawBars(): void {
+    this.barsDirty = false;
+    if (!this.barsGraphics) {
+      this.barsGraphics = this.scene.add.graphics().setDepth(FIRE_BARS_DEPTH);
+    }
+    const g = this.barsGraphics;
+    g.clear();
 
     const barW = 28;
     const barH = 4;
-    inst.ringGraphics.fillStyle(0x09090b, 0.85);
-    inst.ringGraphics.fillRect(inst.data.x - barW / 2, inst.data.y + 6, barW, barH);
-    inst.ringGraphics.fillStyle(0xef4444, 1);
-    inst.ringGraphics.fillRect(
-      inst.data.x - barW / 2,
-      inst.data.y + 6,
-      (barW * inst.data.intensity) / 100,
-      barH
-    );
+    for (const inst of this.fires.values()) {
+      const x = inst.data.x - barW / 2;
+      const y = inst.data.y + 6;
+      g.fillStyle(0x09090b, 0.85);
+      g.fillRect(x, y, barW, barH);
+      g.fillStyle(0xef4444, 1);
+      g.fillRect(x, y, (barW * inst.data.intensity) / 100, barH);
+    }
   }
 }

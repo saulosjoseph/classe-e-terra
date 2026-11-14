@@ -126,6 +126,48 @@ function pickTreeVariant(): number {
   return TREE_SPRITE_VARIANTS;
 }
 
+/** Chave numérica da célula (i, j) da grade de ignição; a faixa cobre o mapa com folga */
+function igCellKey(i: number, j: number): number {
+  return (i + 512) * 4096 + (j + 512);
+}
+
+/**
+ * Agrupa os focos em células do tamanho do raio de ignição. Como a distância isométrica é
+ * sqrt(dx² + (2dy)²), todo foco dentro do raio está nas 9 células em volta da árvore ou do mato.
+ */
+function buildIgnitionGrid(fires: ActiveFireInstance[]): Map<number, ActiveFireInstance[]> {
+  const size = TREE_FIRE.IGNITION_RADIUS;
+  const grid = new Map<number, ActiveFireInstance[]>();
+  for (const fire of fires) {
+    const key = igCellKey(Math.floor(fire.data.x / size), Math.floor(fire.data.y / size));
+    const cell = grid.get(key);
+    if (cell) cell.push(fire);
+    else grid.set(key, [fire]);
+  }
+  return grid;
+}
+
+/** Preenche `out` com os focos das 9 células em volta de (x, y), reaproveitando o mesmo array */
+function collectNearbyFires(
+  grid: Map<number, ActiveFireInstance[]>,
+  x: number,
+  y: number,
+  out: ActiveFireInstance[]
+): ActiveFireInstance[] {
+  out.length = 0;
+  const size = TREE_FIRE.IGNITION_RADIUS;
+  const ci = Math.floor(x / size);
+  const cj = Math.floor(y / size);
+  for (let di = -1; di <= 1; di++) {
+    for (let dj = -1; dj <= 1; dj++) {
+      const cell = grid.get(igCellKey(ci + di, cj + dj));
+      if (!cell) continue;
+      for (const fire of cell) out.push(fire);
+    }
+  }
+  return out;
+}
+
 /** Mato: arbustos e plantas rasteiras (mato_1 a mato_MATO_VARIANTS) espalhados por todo o mapa */
 interface ForestBush {
   x: number;
@@ -167,6 +209,7 @@ export class GameScene extends Phaser.Scene {
   public fireSystem!: FireSmokeSystem;
   private forestTrees: ForestTree[] = [];
   private forestBushes: ForestBush[] = [];
+  private nearbyFiresBuffer: ActiveFireInstance[] = [];
   private staticMapTiles: StaticMapTiles | null = null;
   private treeFireTimer = 0;
   private bushFireTimer = 0;
@@ -1481,9 +1524,10 @@ export class GameScene extends Phaser.Scene {
     const fires = this.fireSystem.getActiveFires();
     if (fires.length === 0) return;
 
+    const grid = buildIgnitionGrid(fires);
     for (const tree of this.forestTrees) {
       if (tree.state !== 'healthy') continue;
-      for (const fire of fires) {
+      for (const fire of collectNearbyFires(grid, tree.x, tree.y, this.nearbyFiresBuffer)) {
         if (getIsoDistance(tree.x, tree.y, fire.data.x, fire.data.y) > TREE_FIRE.IGNITION_RADIUS) continue;
         const chance = TREE_FIRE.IGNITION_CHANCE_PER_CHECK * (fire.data.intensity / 100);
         if (Math.random() < chance) {
@@ -1529,9 +1573,10 @@ export class GameScene extends Phaser.Scene {
     const fires = this.fireSystem.getActiveFires();
     if (fires.length === 0) return;
 
+    const grid = buildIgnitionGrid(fires);
     for (const bush of this.forestBushes) {
       if (bush.state !== 'healthy') continue;
-      for (const fire of fires) {
+      for (const fire of collectNearbyFires(grid, bush.x, bush.y, this.nearbyFiresBuffer)) {
         if (getIsoDistance(bush.x, bush.y, fire.data.x, fire.data.y) > TREE_FIRE.IGNITION_RADIUS) continue;
         const chance = TREE_FIRE.IGNITION_CHANCE_PER_CHECK * (fire.data.intensity / 100);
         if (Math.random() < chance) {
