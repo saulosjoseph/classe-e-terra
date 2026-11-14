@@ -53,8 +53,6 @@ export class FireSmokeSystem extends Phaser.Events.EventEmitter {
   }
 
   public spawnFire(x: number, y: number, initialIntensity = 18): ActiveFireInstance | null {
-    if (this.fires.size >= 18) return null;
-
     // Mantém o foco dentro da zona quadrada isométrica do território da Floresta
     let clampedX = Phaser.Math.Clamp(x, 60, WORLD_WIDTH - 60);
     let clampedY = Phaser.Math.Clamp(y, 60, WORLD_HEIGHT - 60);
@@ -136,9 +134,10 @@ export class FireSmokeSystem extends Phaser.Events.EventEmitter {
 
   /** Solo preto e fumaça preta que marcam um ponto queimado; quem chama decide quando destruí-los */
   public createScorchMark(x: number, y: number): Phaser.GameObjects.GameObject[] {
-    const ground = this.scene.add.graphics().setDepth(3);
-    ground.fillStyle(0x0c0a09, 0.85);
-    ground.fillEllipse(x, y, 70, 35, 24);
+    const ground = this.scene.add
+      .image(x, y, 'solo_queimado')
+      .setScale(0.45)
+      .setDepth(3);
 
     const smoke = this.scene.add
       .sprite(x, y - 30, 'smoke_4')
@@ -316,7 +315,7 @@ export class FireSmokeSystem extends Phaser.Events.EventEmitter {
       this.spreadTimer = 0;
       const currentFires = Array.from(this.fires.values());
       for (const inst of currentFires) {
-        if (inst.data.intensity >= 74 && this.fires.size < 16) {
+        if (inst.data.intensity >= 74) {
           const chance =
             inst.data.sector === SectorType.FLORESTA && indigenousDemarcationActive ? 0.22 : 0.42;
           if (Math.random() < chance) {

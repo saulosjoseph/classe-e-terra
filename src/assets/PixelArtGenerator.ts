@@ -4,15 +4,13 @@ import Phaser from 'phaser';
  * Gera todas as texturas em Alta Densidade de Pixels (HD Pixel Art nativo) diretamente via Canvas no BootScene.
  * Respeita rigorosamente a regra visual do GDD:
  * - Cores vivas na resistência (verde da mata, tons quentes da cidade viva)
- * - Fumaça tóxica evolui estritamente de cinza claro até preto denso e absoluto (SEM laranja/vermelho na fumaça).
+ * - Fogo e fumaça tóxica vêm das folhas fumaça-clara/fumaça-escura (carregadas no BootScene), não daqui.
  */
 export class PixelArtGenerator {
   public static generateAll(scene: Phaser.Scene): void {
     this.generateHDShadow(scene);
     this.generateHDVoluntario(scene);
     this.generateHDGuarda(scene);
-    this.generateHDFire(scene);
-    this.generateHDSmoke(scene);
     this.generateHDTree(scene);
     this.generateHDFarm(scene);
     this.generateHDCityHouse(scene);
@@ -214,100 +212,6 @@ export class PixelArtGenerator {
     this.line(ctx, 19, 42, 25, 42, '#27272a');
 
     this.finalizeCanvas(scene, 'unit_guarda');
-  }
-
-  // 5. Foco de Fogo HD (36x36: lenha em brasa no solo, labaredas fluidas e faíscas incandescentes)
-  private static generateHDFire(scene: Phaser.Scene): void {
-    const ctx = this.initCanvas(scene, 'fire_node', 36, 36);
-    if (!ctx) return;
-
-    // Solo queimado e cinzas
-    ctx.fillStyle = '#18181b';
-    ctx.beginPath();
-    ctx.ellipse(18, 29, 14, 6, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Troncos de lenha cruzados
-    this.line(ctx, 8, 27, 27, 31, '#451a03');
-    this.line(ctx, 8, 28, 27, 32, '#78350f');
-    this.line(ctx, 27, 27, 8, 31, '#451a03');
-    this.line(ctx, 27, 28, 8, 32, '#78350f');
-
-    // Fendas de brasa viva na lenha
-    this.px(ctx, 15, 29, '#facc15');
-    this.px(ctx, 18, 28, '#f97316');
-    this.px(ctx, 21, 29, '#ef4444');
-
-    // Labareda externa vermelha ardente
-    this.poly(ctx, [
-      [10, 28], [8, 21], [12, 15], [14, 8], [17, 3],
-      [19, 1], [22, 7], [25, 14], [28, 20], [26, 28]
-    ], '#dc2626');
-
-    // Corpo de chama laranja vivo
-    this.poly(ctx, [
-      [12, 27], [10, 20], [14, 14], [17, 7], [19, 5],
-      [21, 10], [24, 18], [24, 27]
-    ], '#f97316');
-
-    // Núcleo de calor amarelo intenso
-    this.poly(ctx, [
-      [14, 26], [13, 21], [16, 16], [18, 11], [20, 14],
-      [22, 20], [21, 26]
-    ], '#fde047');
-
-    // Ponto mais quente incandescente branco
-    this.poly(ctx, [[16, 24], [17, 18], [19, 18], [19, 24]], '#ffffff');
-
-    // Labaredas laterais e faíscas incandescentes
-    this.poly(ctx, [[6, 25], [8, 18], [11, 22]], '#ea580c');
-    this.poly(ctx, [[26, 23], [29, 16], [28, 25]], '#ea580c');
-    this.px(ctx, 19, 0, '#fef08a');
-    this.px(ctx, 13, 5, '#facc15');
-    this.px(ctx, 24, 6, '#f97316');
-    this.px(ctx, 27, 12, '#fde047');
-
-    this.finalizeCanvas(scene, 'fire_node');
-  }
-
-  // 6. Nuvens de Fumaça Tóxica HD (44x44: volumétrica, estritamente do cinza claro ao preto denso sem laranja/vermelho)
-  private static generateHDSmoke(scene: Phaser.Scene): void {
-    const shades = [
-      { key: 'smoke_1', c1: '#f4f4f5', c2: '#e4e4e7', c3: '#d4d4d8', c4: '#a1a1aa' },
-      { key: 'smoke_2', c1: '#a1a1aa', c2: '#71717a', c3: '#52525b', c4: '#3f3f46' },
-      { key: 'smoke_3', c1: '#52525b', c2: '#3f3f46', c3: '#27272a', c4: '#18181b' },
-      { key: 'smoke_4', c1: '#18181b', c2: '#09090b', c3: '#000000', c4: '#000000' }
-    ];
-
-    for (const s of shades) {
-      const ctx = this.initCanvas(scene, s.key, 44, 44);
-      if (!ctx) continue;
-
-      ctx.fillStyle = s.c4;
-      ctx.beginPath();
-      ctx.ellipse(22, 22, 19, 17, 0, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.fillStyle = s.c3;
-      ctx.beginPath();
-      ctx.ellipse(16, 20, 12, 11, 0, 0, Math.PI * 2);
-      ctx.ellipse(27, 21, 13, 12, 0, 0, Math.PI * 2);
-      ctx.ellipse(22, 16, 11, 10, 0, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.fillStyle = s.c2;
-      ctx.beginPath();
-      ctx.ellipse(18, 17, 8, 7, 0, 0, Math.PI * 2);
-      ctx.ellipse(26, 18, 8, 7, 0, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.fillStyle = s.c1;
-      ctx.beginPath();
-      ctx.ellipse(20, 15, 5, 4, 0, 0, Math.PI * 2);
-      ctx.fill();
-
-      this.finalizeCanvas(scene, s.key);
-    }
   }
 
   // 7. Samaúma / Castanheira Majestosa do Tapajós HD (64x72: copa densa multicamadas, sapopembas e bromélias)
