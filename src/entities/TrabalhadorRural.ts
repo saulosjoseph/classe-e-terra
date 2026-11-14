@@ -50,15 +50,10 @@ export class TrabalhadorRural extends Unit {
     const dtSec = deltaMs / 1000;
     const smokeAtPos = fireSystem.getSmokeLevelAtPoint(this.x, this.y);
 
-    let targetFire: ActiveFireInstance | null = null;
-    let nearestDist = Infinity;
-    for (const fire of fireSystem.getActiveFires()) {
-      const d = getIsoDistance(this.x, this.y, fire.data.x, fire.data.y);
-      if (d < nearestDist) {
-        nearestDist = d;
-        targetFire = fire;
-      }
-    }
+    const targetFire: ActiveFireInstance | null = fireSystem.findNearestFire(this.x, this.y);
+    const nearestDist = targetFire
+      ? getIsoDistance(this.x, this.y, targetFire.data.x, targetFire.data.y)
+      : Infinity;
 
     // Sem fogo para apagar, fica parado no ponto onde foi recrutado (na zona rural)
     if (targetFire) {

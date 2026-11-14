@@ -50,7 +50,7 @@ import { Incendiario } from '../entities/Incendiario';
 import { TrabalhadorRural, TrabalhadorRuralVariant } from '../entities/TrabalhadorRural';
 import { Unit } from '../entities/Unit';
 import { CollisionSystem, getCollisionSystem, registerCollisionSystem } from '../systems/CollisionSystem';
-import { ActiveFireInstance, FireSmokeSystem } from '../systems/FireSmokeSystem';
+import { ActiveFireInstance, FireSmokeSystem, ScorchMark } from '../systems/FireSmokeSystem';
 import { PoliticalPhaseSystem } from '../systems/PoliticalPhaseSystem';
 import { SectorSystem } from '../systems/SectorSystem';
 import { SpawnerSystem } from '../systems/SpawnerSystem';
@@ -101,7 +101,7 @@ interface ForestTree {
   variant: number;
   burnLeftMs: number;
   /** Marca visual do solo queimado (solo preto e fumaça), removida ao replantar */
-  scorch: Phaser.GameObjects.GameObject[];
+  scorch: ScorchMark[];
 }
 
 /** Quantidade de espécies de árvore (arvore_N e arvore_queimada_N) */
@@ -1184,7 +1184,7 @@ export class GameScene extends Phaser.Scene {
 
           const prefeitura = this.add.sprite(px, py, 'prefeitura');
           prefeitura.setOrigin(0.5, 0.652);
-          prefeitura.setScale(580 / 2477);
+          prefeitura.setScale(580 / prefeitura.width);
           prefeitura.setDepth(py + 14);
           prefeitura.setInteractive({ useHandCursor: true });
           prefeitura.on('pointerup', (pointer: Phaser.Input.Pointer) => {
@@ -1324,7 +1324,7 @@ export class GameScene extends Phaser.Scene {
     const baseSprite = this.add
       .sprite(baseX, baseY, 'base_brigadista_voluntario')
       .setOrigin(0.5, 0.75)
-      .setScale(440 / 2338);
+      .setScale(440 / 880);
     baseSprite.setDepth(15 + Math.floor(baseY + baseSprite.displayHeight * 0.25));
     this.brigadistaBaseSprite = baseSprite;
     baseSprite.setInteractive({ useHandCursor: true });
@@ -1339,7 +1339,7 @@ export class GameScene extends Phaser.Scene {
     const bombeirosSprite = this.add
       .sprite(BASE_BOMBEIROS_X, BASE_BOMBEIROS_Y, 'base_bombeiros')
       .setOrigin(0.5, 0.75)
-      .setScale(380 / 1156);
+      .setScale(380 / 760);
     bombeirosSprite.setDepth(15 + Math.floor(BASE_BOMBEIROS_Y + bombeirosSprite.displayHeight * 0.25));
     bombeirosSprite.setInteractive({ useHandCursor: true });
     bombeirosSprite.on('pointerup', (pointer: Phaser.Input.Pointer) => {

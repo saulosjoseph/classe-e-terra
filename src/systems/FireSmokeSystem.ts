@@ -17,12 +17,23 @@ import {
 import { FireNodeData, SectorType } from '../types/GameTypes';
 import { SoundManager } from '../audio/SoundManager';
 
+/** Escalas aplicadas às texturas de marca de queimada (assadas no Blitter, pois bobs não têm escala) */
+const SCORCH_GROUND_SCALE = 0.45;
+const SCORCH_SMOKE_SCALE = 0.9;
+
+/** Marca de queimada individual (bob de Blitter); destruí-la remove o desenho */
+export interface ScorchMark {
+  destroy(): void;
+}
+
 export interface ActiveFireInstance {
   data: FireNodeData;
   fireSprite: Phaser.GameObjects.Sprite;
   smokeSprite: Phaser.GameObjects.Sprite;
   ringGraphics: Phaser.GameObjects.Graphics;
   hitZone: Phaser.GameObjects.Zone;
+  /** Último estado desenhado em ringGraphics (nível de fumaça + intensidade inteira) */
+  ringStateKey: number;
 }
 
 /**
@@ -42,6 +53,10 @@ export class FireSmokeSystem extends Phaser.Events.EventEmitter {
   private waterShieldUntil = 0;
   private nextId = 1;
   private spreadTimer = 0;
+  private scorchGroundBlitter: Phaser.GameObjects.Blitter | null = null;
+  private scorchSmokeBlitter: Phaser.GameObjects.Blitter | null = null;
+  private scorchGroundSize = { w: 0, h: 0 };
+  private scorchSmokeSize = { w: 0, h: 0 };
 
   constructor(scene: Phaser.Scene) {
     super();
@@ -50,6 +65,20 @@ export class FireSmokeSystem extends Phaser.Events.EventEmitter {
 
   public getActiveFires(): ActiveFireInstance[] {
     return Array.from(this.fires.values());
+  }
+
+  /** Foco ativo mais próximo de (x, y), sem alocar lista intermediária */
+  public findNearestFire(x: number, y: number): ActiveFireInstance | null {
+    let nearest: ActiveFireInstance | null = null;
+    let nearestDist = Infinity;
+    for (const fire of this.fires.values()) {
+      const d = getIsoDistance(x, y, fire.data.x, fire.data.y);
+      if (d < nearestDist) {
+        nearestDist = d;
+        nearest = fire;
+      }
+    }
+    return nearest;
   }
 
   public spawnFire(x: number, y: number, initialIntensity = 18): ActiveFireInstance | null {
@@ -117,7 +146,8 @@ export class FireSmokeSystem extends Phaser.Events.EventEmitter {
       fireSprite,
       smokeSprite,
       ringGraphics,
-      hitZone
+      hitZone,
+      ringStateKey: -1
     };
 
     hitZone.on('pointerup', (pointer: Phaser.Input.Pointer) => {
@@ -133,21 +163,60 @@ export class FireSmokeSystem extends Phaser.Events.EventEmitter {
   }
 
   /** Solo preto e fumaça preta que marcam um ponto queimado; quem chama decide quando destruí-los */
-  public createScorchMark(x: number, y: number): Phaser.GameObjects.GameObject[] {
-    const ground = this.scene.add
-      .image(x, y, 'solo_queimado')
-      .setScale(0.45)
-      .setDepth(3);
+  public createScorchMark(x: number, y: number): ScorchMark[] {
+    this.ensureScorchBlitters();
 
-    const smoke = this.scene.add
-      .sprite(x, y - 30, 'smoke_4')
-      .setOrigin(0.5, 0.8)
-      .setScale(0.9)
-      .setAlpha(0.55)
-      .setDepth(15 + Math.floor(y) + 1);
+    // Posições do Blitter são o canto superior esquerdo da textura
+    const ground = this.scorchGroundBlitter!.create(
+      x - this.scorchGroundSize.w / 2,
+      y - this.scorchGroundSize.h / 2
+    );
+
+    const smoke = this.scorchSmokeBlitter!.create(
+      x - this.scorchSmokeSize.w / 2,
+      y - 30 - this.scorchSmokeSize.h * 0.8
+    );
+    smoke.setAlpha(0.55);
 
     return [ground, smoke];
   }
+
+  /**
+   * Cria as texturas de marca com a escala já aplicada e um Blitter para cada uma.
+   * Um Blitter desenha todos os seus bobs em uma só chamada e cada marca vira um objeto leve,
+   * em vez de dois GameObjects com profundidade própria.
+   */
+  private ensureScorchBlitters(): void {
+    if (this.scorchGroundBlitter) return;
+
+    const groundKey = this.bakeScaledTexture('solo_queimado', SCORCH_GROUND_SCALE, 'scorch_ground');
+    const smokeKey = this.bakeScaledTexture('smoke_4', SCORCH_SMOKE_SCALE, 'scorch_smoke');
+
+    this.scorchGroundBlitter = this.scene.add.blitter(0, 0, groundKey).setDepth(3);
+    this.scorchSmokeBlitter = this.scene.add.blitter(0, 0, smokeKey).setDepth(3.1);
+    this.scorchGroundSize = this.textureSize(groundKey);
+    this.scorchSmokeSize = this.textureSize(smokeKey);
+  }
+
+  private textureSize(key: string): { w: number; h: number } {
+    const img = this.scene.textures.get(key).getSourceImage();
+    return { w: img.width, h: img.height };
+  }
+
+  private bakeScaledTexture(srcKey: string, scale: number, outKey: string): string {
+    const textures = this.scene.textures;
+    if (textures.exists(outKey)) return outKey;
+
+    const src = textures.get(srcKey).getSourceImage();
+    const w = Math.round(src.width * scale);
+    const h = Math.round(src.height * scale);
+    const dt = textures.addDynamicTexture(outKey, w, h);
+    if (!dt) throw new Error(`Falha ao criar textura de marca: ${outKey}`);
+    dt.stamp(srcKey, undefined, 0, 0, { originX: 0, originY: 0, scale });
+    dt.render();
+    return outKey;
+  }
+
 
   public extinguishFire(id: string, amount: number): boolean {
     const inst = this.fires.get(id);
@@ -353,6 +422,16 @@ export class FireSmokeSystem extends Phaser.Events.EventEmitter {
     inst.smokeSprite.setScale(1.2 + inst.data.smokeLevel * 0.52);
     inst.smokeSprite.setPosition(inst.data.x, inst.data.y - 22).setDepth(yDepth + 5);
 
+    const ringStateKey = inst.data.smokeLevel * 1000 + Math.round(inst.data.intensity);
+    if (ringStateKey !== inst.ringStateKey) {
+      inst.ringStateKey = ringStateKey;
+      this.drawFireRing(inst);
+    }
+  }
+
+  /** Redesenha o halo de fumaça e a barra de intensidade; chamado só quando o estado visível muda */
+  private drawFireRing(inst: ActiveFireInstance): void {
+    const smokeCfg = SMOKE_PALETTE[inst.data.smokeLevel];
     inst.ringGraphics.clear();
     inst.ringGraphics.setDepth(16 + Math.floor(inst.data.y));
     const smokeRadius = 24 + inst.data.smokeLevel * 14;

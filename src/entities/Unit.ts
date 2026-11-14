@@ -34,6 +34,7 @@ export abstract class Unit extends Phaser.Events.EventEmitter {
   protected equipmentBoostUntil = 0;
   protected patrolAngle = 0;
   protected statusBarOffsetY = 28;
+  private overlayKey = -1;
   protected navRoute: NavRoute = createNavRoute();
 
   constructor(
@@ -207,36 +208,48 @@ export abstract class Unit extends Phaser.Events.EventEmitter {
   }
 
   protected drawOverlays(): void {
+    // Os Graphics seguem a posição da unidade; só são redesenhados quando a aparência muda
+    this.selectionRing.setPosition(this.x, this.y);
+    this.statusBar.setPosition(this.x, this.y);
+
+    const w = 24;
+    const h = 3;
+    const ratio = Phaser.Math.Clamp(this.stamina / this.maxStamina, 0, 1);
+    const barPx = Math.round(w * ratio);
+    const ringMode = this.isFollowed ? 0 : this.hasEquipmentBoost() ? 1 : 2;
+    const barColorMode = ratio > 0.35 ? 0 : 1;
+    const key = ((ringMode * 2 + barColorMode) * 100 + barPx) * 2 + (this.unitType === UnitType.GUARDA_FLORESTAL ? 1 : 0);
+    if (key === this.overlayKey) return;
+    this.overlayKey = key;
+
     this.selectionRing.clear();
     if (this.isFollowed) {
       // Destaque dourado e branco pulsante indicando que a câmera está acompanhando esta unidade
       this.selectionRing.lineStyle(2.5, 0xfacc15, 1.0);
-      this.selectionRing.strokeEllipse(this.x, this.y, 34, 17, 24);
+      this.selectionRing.strokeEllipse(0, 0, 34, 17, 24);
       this.selectionRing.lineStyle(1.5, 0xffffff, 0.9);
-      this.selectionRing.strokeEllipse(this.x, this.y, 40, 20, 24);
+      this.selectionRing.strokeEllipse(0, 0, 40, 20, 24);
     } else if (this.hasEquipmentBoost()) {
       this.selectionRing.lineStyle(2, 0xfacc15, 0.9);
-      this.selectionRing.strokeEllipse(this.x, this.y, 30, 15, 24);
+      this.selectionRing.strokeEllipse(0, 0, 30, 15, 24);
     } else {
       this.selectionRing.lineStyle(
         1.5,
         this.unitType === UnitType.GUARDA_FLORESTAL ? 0x10b981 : 0x38bdf8,
         0.55
       );
-      this.selectionRing.strokeEllipse(this.x, this.y, 26, 13, 24);
+      this.selectionRing.strokeEllipse(0, 0, 26, 13, 24);
     }
 
     this.statusBar.clear();
-    const w = 24;
-    const h = 3;
-    const barY = this.y - this.statusBarOffsetY;
+    const barY = -this.statusBarOffsetY;
     this.statusBar.fillStyle(0x090d0a, 0.85);
-    this.statusBar.fillRect(this.x - w / 2, barY, w, h);
-    const ratio = Phaser.Math.Clamp(this.stamina / this.maxStamina, 0, 1);
+    this.statusBar.fillRect(-w / 2, barY, w, h);
     const color = ratio > 0.35 ? 0x38bdf8 : 0xf59e0b;
     this.statusBar.fillStyle(color, 1);
-    this.statusBar.fillRect(this.x - w / 2, barY, w * ratio, h);
+    this.statusBar.fillRect(-w / 2, barY, w * ratio, h);
   }
+
 
   public destroy(): void {
     this.hitZone.destroy();
