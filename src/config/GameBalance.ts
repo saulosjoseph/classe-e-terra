@@ -96,6 +96,18 @@ export const BASE_BRIGADISTA_Y = WORLD_CENTER_Y - 600;
 export const BASE_BOMBEIROS_X = WORLD_CENTER_X - 960;
 export const BASE_BOMBEIROS_Y = WORLD_CENTER_Y - 360;
 
+/** Máximo de casas por quarteirão da cidade */
+export const MAX_HOUSES_PER_BLOCK = 4;
+
+/** Quarteirões (i, j) da cidade sem casas (com árvores no lugar delas) */
+export const CITY_EMPTY_BLOCKS: ReadonlyArray<readonly [number, number]> = [
+  [-3, -2],
+  [-1, -3],
+  [-2, 3],
+  [1, 2],
+  [2, 1]
+];
+
 /** Aldeias indígenas: largura em px do mundo, recuo para dentro de cada vértice do losango e clareira de árvores */
 export const ALDEIA = {
   WIDTH: 500,

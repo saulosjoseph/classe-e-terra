@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { PixelArtGenerator } from '../assets/PixelArtGenerator';
+import { CASAS_RURAIS_TEXTURAS, CASAS_URBANAS_TEXTURAS } from '../config/casas';
 
 export class BootScene extends Phaser.Scene {
   constructor() {
@@ -28,7 +29,9 @@ export class BootScene extends Phaser.Scene {
     for (let variant = 1; variant <= 9; variant++) {
       this.load.image(`pedra_${variant}`, `assets/pedra_${variant}.png`);
     }
-    this.load.image('casa_rural', 'assets/casa_rural.png');
+    for (const key of [...CASAS_RURAIS_TEXTURAS, ...CASAS_URBANAS_TEXTURAS]) {
+      this.load.image(key, `assets/${key}.png`);
+    }
     this.load.image('base_bombeiros', 'assets/base_bombeiros.png');
     this.load.image('caminhao_bombeiros', 'assets/caminhao_bombeiros.png');
     this.load.spritesheet('bombeiro_spray', 'assets/bombeiro_spray.png', {

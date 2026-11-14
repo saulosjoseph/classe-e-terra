@@ -52,7 +52,7 @@ export class MenuScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     // Decorações em Pixel Art na faixa do rio
-    this.add.sprite(120, 96, 'prop_city_house').setScale(1.2);
+    this.add.sprite(120, 96, 'casa_urbana').setScale(0.39);
     this.add.sprite(240, 96, 'brigada_comunitaria', 0).setScale(0.9);
     this.add.sprite(360, 96, 'prop_farm').setScale(1.2);
     this.add.sprite(480, 96, 'unit_guarda').setScale(1.2);

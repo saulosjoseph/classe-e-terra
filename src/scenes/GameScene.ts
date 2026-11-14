@@ -8,6 +8,8 @@ import {
   BASE_BOMBEIROS_X,
   BASE_BOMBEIROS_Y,
   CAMPO_RADIUS,
+  CITY_EMPTY_BLOCKS,
+  MAX_HOUSES_PER_BLOCK,
   CAMPO_RADIUS_Y,
   CITY_RADIUS,
   CITY_RADIUS_Y,
@@ -38,6 +40,7 @@ import {
   getSectorAtPoint
 } from '../config/GameBalance';
 import { SoundManager } from '../audio/SoundManager';
+import { CASAS_RURAIS_TEXTURAS, CASAS_URBANAS_TEXTURAS } from '../config/casas';
 import { BossFortress } from '../entities/BossFortress';
 import { Brigadista } from '../entities/Brigadista';
 import { Bombeiro } from '../entities/Bombeiro';
@@ -63,6 +66,9 @@ import {
   SectorType,
   UnitType
 } from '../types/GameTypes';
+
+// Desloca as casas da cidade 19 px para a esquerda (tela) para ficarem centralizadas nos quarteirões
+const CITY_HOUSE_SHIFT_LEFT = 19;
 
 export interface FollowableTarget {
   id: string;
@@ -761,9 +767,11 @@ export class GameScene extends Phaser.Scene {
   }
 
   private createCityHouse(hx: number, hy: number): void {
-    const sprite = this.add.sprite(hx, hy, 'casa_isometrica');
-    sprite.setScale(1.3);
-    sprite.setOrigin(0.5, 0.88);
+    const textura = CASAS_URBANAS_TEXTURAS[Phaser.Math.Between(0, CASAS_URBANAS_TEXTURAS.length - 1)];
+    // Escala que mantém a largura das casas urbanas anteriores (128 px × 1.3 ≈ 166 px)
+    const sprite = this.add.sprite(hx, hy, textura);
+    sprite.setScale(0.63);
+    sprite.setOrigin(0.5, 0.9);
     sprite.setDepth(hy);
 
     const obstacleId = getCollisionSystem(this).addObstacle(hx, hy, COLLISION.HOUSE_RADIUS);
@@ -776,6 +784,39 @@ export class GameScene extends Phaser.Scene {
       if (pointer.getDistance() > 10) return;
       this.onCityHouseClicked(house);
     });
+  }
+
+  /** Planta até 2 árvores e 5 matos num quarteirão vazio: decorativos, fora da floresta que pode queimar */
+  private plantCityBlockVegetation(uc: number, vc: number, cx: number, cy: number): void {
+    const treeOffsets: Array<[number, number]> = [
+      [-60, -60],
+      [60, 60]
+    ];
+    for (const [du, dv] of treeOffsets) {
+      const u = uc + du + Phaser.Math.Between(-20, 20);
+      const v = vc + dv + Phaser.Math.Between(-20, 20);
+      const x = cx + u - v;
+      const y = cy + (u + v) * 0.5;
+      const variant = pickTreeVariant();
+      this.add
+        .sprite(x, y, `arvore_${variant}`)
+        .setOrigin(0.5, TREE_SPRITE_ORIGIN_Y)
+        .setScale(TREE_SPRITE_SCALE * (TREE_SPRITE_SCALE_BY_VARIANT[variant] ?? 1))
+        .setDepth(15 + Math.floor(y));
+      getCollisionSystem(this).addObstacle(x, y, COLLISION.TREE_RADIUS);
+    }
+
+    for (let k = 0; k < 5; k++) {
+      const u = uc + Phaser.Math.Between(-90, 90);
+      const v = vc + Phaser.Math.Between(-90, 90);
+      const x = cx + u - v;
+      const y = cy + (u + v) * 0.5;
+      this.add
+        .image(x, y, `mato_${Phaser.Math.Between(1, MATO_VARIANTS)}`)
+        .setOrigin(0.5, MATO_SPRITE_ORIGIN_Y)
+        .setScale(MATO_SPRITE_SCALE)
+        .setDepth(15 + Math.floor(y));
+    }
   }
 
   private onCityHouseClicked(house: CityHouse): void {
@@ -1128,6 +1169,12 @@ export class GameScene extends Phaser.Scene {
           continue;
         }
 
+        // Quarteirões deixados vazios (gramado com 2 árvores e 5 matos, sem casas)
+        if (CITY_EMPTY_BLOCKS.some(([ei, ej]) => ei === i && ej === j)) {
+          this.plantCityBlockVegetation(uc, vc, cx, cy);
+          continue;
+        }
+
         // Quadra dupla central ((-1, 0) + (0, 0)): Palácio Municipal (Prefeitura) ocupando os 2 quarteirões somados
         if (i === 0 && j === 0) {
           const mergedUc = 0; // Centro entre os quarteirões i = -1 e i = 0
@@ -1207,6 +1254,9 @@ export class GameScene extends Phaser.Scene {
           else { frontCount = 3; backCount = 0; }
         }
 
+        // Limite de 4 casas por quarteirão: a fileira traseira absorve o excesso
+        backCount = Math.min(backCount, MAX_HOUSES_PER_BLOCK - frontCount);
+
         const getRowOffsets = (count: number): number[] => {
           if (count === 4) return [-66, -22, 22, 66];
           if (count === 3) return [-44, 0, 44];
@@ -1220,7 +1270,7 @@ export class GameScene extends Phaser.Scene {
         const frontV = vc + 22;
         for (const offU of frontOffsets) {
           const u = uc + offU;
-          const hx = cx + u - frontV;
+          const hx = cx + u - frontV - CITY_HOUSE_SHIFT_LEFT;
           const hy = cy + (u + frontV) * 0.5;
 
           this.createCityHouse(hx, hy);
@@ -1231,7 +1281,7 @@ export class GameScene extends Phaser.Scene {
         const backV = vc - 60;
         for (const offU of backOffsets) {
           const u = uc + offU;
-          const hx = cx + u - backV;
+          const hx = cx + u - backV - CITY_HOUSE_SHIFT_LEFT;
           const hy = cy + (u + backV) * 0.5;
 
           this.createCityHouse(hx, hy);
@@ -1255,7 +1305,7 @@ export class GameScene extends Phaser.Scene {
       }
       casasRurais.push(pt);
       this.add
-        .sprite(pt.x, pt.y, 'casa_rural')
+        .sprite(pt.x, pt.y, CASAS_RURAIS_TEXTURAS[Phaser.Math.Between(0, CASAS_RURAIS_TEXTURAS.length - 1)])
         .setOrigin(0.5, 0.9)
         .setScale(0.85)
         .setDepth(15 + Math.floor(pt.y));
