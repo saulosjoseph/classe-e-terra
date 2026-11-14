@@ -19,6 +19,10 @@ import { SoundManager } from '../audio/SoundManager';
 
 /** Profundidade única das barras de intensidade: uma só camada para todos os focos */
 const FIRE_BARS_DEPTH = 9000;
+/** Lado de cada bloco de marcas de queimada, em px do mundo */
+const SCORCH_TILE_SIZE = 1024;
+/** Margem extra na decisão de visibilidade, cobrindo o atraso de um quadro da câmera */
+const SCORCH_CULL_MARGIN = 256;
 
 /** Escalas aplicadas às texturas de marca de queimada (assadas no Blitter, pois bobs não têm escala) */
 const SCORCH_GROUND_SCALE = 0.45;
@@ -27,6 +31,16 @@ const SCORCH_SMOKE_SCALE = 0.9;
 /** Marca de queimada individual (bob de Blitter); destruí-la remove o desenho */
 export interface ScorchMark {
   destroy(): void;
+}
+
+/** Blitters de marcas de queimada de um bloco do mapa; cada bloco é escondido quando está fora da câmera */
+interface ScorchTile {
+  ground: Phaser.GameObjects.Blitter;
+  smoke: Phaser.GameObjects.Blitter;
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
 }
 
 export interface ActiveFireInstance {
@@ -57,10 +71,11 @@ export class FireSmokeSystem extends Phaser.Events.EventEmitter {
   private waterShieldUntil = 0;
   private nextId = 1;
   private spreadTimer = 0;
-  private scorchGroundBlitter: Phaser.GameObjects.Blitter | null = null;
-  private scorchSmokeBlitter: Phaser.GameObjects.Blitter | null = null;
+  private scorchGroundKey: string | null = null;
+  private scorchSmokeKey: string | null = null;
   private scorchGroundSize = { w: 0, h: 0 };
   private scorchSmokeSize = { w: 0, h: 0 };
+  private scorchTiles: Map<string, ScorchTile> = new Map();
   private barsGraphics: Phaser.GameObjects.Graphics | null = null;
   private barsDirty = false;
 
@@ -174,15 +189,16 @@ export class FireSmokeSystem extends Phaser.Events.EventEmitter {
 
   /** Solo preto e fumaça preta que marcam um ponto queimado; quem chama decide quando destruí-los */
   public createScorchMark(x: number, y: number): ScorchMark[] {
-    this.ensureScorchBlitters();
+    this.ensureScorchTextures();
+    const tile = this.getScorchTile(x, y);
 
     // Posições do Blitter são o canto superior esquerdo da textura
-    const ground = this.scorchGroundBlitter!.create(
+    const ground = tile.ground.create(
       x - this.scorchGroundSize.w / 2,
       y - this.scorchGroundSize.h / 2
     );
 
-    const smoke = this.scorchSmokeBlitter!.create(
+    const smoke = tile.smoke.create(
       x - this.scorchSmokeSize.w / 2,
       y - 30 - this.scorchSmokeSize.h * 0.8
     );
@@ -192,20 +208,55 @@ export class FireSmokeSystem extends Phaser.Events.EventEmitter {
   }
 
   /**
-   * Cria as texturas de marca com a escala já aplicada e um Blitter para cada uma.
-   * Um Blitter desenha todos os seus bobs em uma só chamada e cada marca vira um objeto leve,
-   * em vez de dois GameObjects com profundidade própria.
+   * Cria as texturas de marca com a escala já aplicada, uma única vez.
+   * Um Blitter desenha todos os seus bobs em uma só chamada.
    */
-  private ensureScorchBlitters(): void {
-    if (this.scorchGroundBlitter) return;
+  private ensureScorchTextures(): void {
+    if (this.scorchGroundKey) return;
 
-    const groundKey = this.bakeScaledTexture('solo_queimado', SCORCH_GROUND_SCALE, 'scorch_ground');
-    const smokeKey = this.bakeScaledTexture('smoke_4', SCORCH_SMOKE_SCALE, 'scorch_smoke');
+    this.scorchGroundKey = this.bakeScaledTexture('solo_queimado', SCORCH_GROUND_SCALE, 'scorch_ground');
+    this.scorchSmokeKey = this.bakeScaledTexture('smoke_4', SCORCH_SMOKE_SCALE, 'scorch_smoke');
+    this.scorchGroundSize = this.textureSize(this.scorchGroundKey);
+    this.scorchSmokeSize = this.textureSize(this.scorchSmokeKey);
+  }
 
-    this.scorchGroundBlitter = this.scene.add.blitter(0, 0, groundKey).setDepth(3);
-    this.scorchSmokeBlitter = this.scene.add.blitter(0, 0, smokeKey).setDepth(3.1);
-    this.scorchGroundSize = this.textureSize(groundKey);
-    this.scorchSmokeSize = this.textureSize(smokeKey);
+  /**
+   * Blitters são agrupados em blocos. Um Blitter desenha todos os bobs, mesmo fora da tela,
+   * então separar em blocos permite esconder os que estão longe da câmera.
+   */
+  private getScorchTile(x: number, y: number): ScorchTile {
+    const i = Math.floor(x / SCORCH_TILE_SIZE);
+    const j = Math.floor(y / SCORCH_TILE_SIZE);
+    const key = `${i},${j}`;
+    const existing = this.scorchTiles.get(key);
+    if (existing) return existing;
+
+    const tile: ScorchTile = {
+      ground: this.scene.add.blitter(0, 0, this.scorchGroundKey!).setDepth(3),
+      smoke: this.scene.add.blitter(0, 0, this.scorchSmokeKey!).setDepth(3.1),
+      minX: i * SCORCH_TILE_SIZE,
+      minY: j * SCORCH_TILE_SIZE,
+      maxX: (i + 1) * SCORCH_TILE_SIZE,
+      maxY: (j + 1) * SCORCH_TILE_SIZE
+    };
+    this.scorchTiles.set(key, tile);
+    return tile;
+  }
+
+  private cullScorchTiles(): void {
+    const view = this.scene.cameras.main.worldView;
+    const left = view.x - SCORCH_CULL_MARGIN;
+    const top = view.y - SCORCH_CULL_MARGIN;
+    const right = view.x + view.width + SCORCH_CULL_MARGIN;
+    const bottom = view.y + view.height + SCORCH_CULL_MARGIN;
+
+    for (const tile of this.scorchTiles.values()) {
+      const visible = tile.maxX >= left && tile.minX <= right && tile.maxY >= top && tile.minY <= bottom;
+      if (tile.ground.visible !== visible) {
+        tile.ground.setVisible(visible);
+        tile.smoke.setVisible(visible);
+      }
+    }
   }
 
   private textureSize(key: string): { w: number; h: number } {
@@ -343,6 +394,7 @@ export class FireSmokeSystem extends Phaser.Events.EventEmitter {
     fireGrowthMultiplier: number,
     indigenousDemarcationActive: boolean
   ): { forestDamage: number } {
+    this.cullScorchTiles();
     const now = this.scene.time.now;
 
     this.firebreaks = this.firebreaks.filter((fb) => {

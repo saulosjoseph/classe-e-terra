@@ -18,6 +18,7 @@ import {
   WORLD_CENTER_Y
 } from '../config/GameBalance';
 import { SoundManager } from '../audio/SoundManager';
+import { OptionsMenu } from '../ui/OptionsMenu';
 import { toggleGameFullscreen } from '../systems/FullscreenManager';
 import {
   IntegratedActionType,
@@ -45,6 +46,7 @@ interface TouchActionButton {
  */
 export class UIScene extends Phaser.Scene {
   private gameScene!: GameScene;
+  private optionsMenu!: OptionsMenu;
 
   private topBarsGraphics!: Phaser.GameObjects.Graphics;
   private forestValueText!: Phaser.GameObjects.Text;
@@ -87,6 +89,11 @@ export class UIScene extends Phaser.Scene {
     this.createBottomThumbPanel();
     this.createPhaseBanner();
     this.createStoryModal();
+
+    this.optionsMenu = new OptionsMenu(this, this.gameScene);
+    if (this.input.keyboard) {
+      this.input.keyboard.on('keydown-ESC', () => this.optionsMenu.toggle());
+    }
 
     this.gameScene.events.on('show-donation-info', this.showDonationInfoModal, this);
     this.gameScene.events.on('show-trabalhador-info', this.showTrabalhadorInfoModal, this);
