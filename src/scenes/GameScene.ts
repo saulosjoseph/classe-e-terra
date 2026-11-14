@@ -54,6 +54,7 @@ import { ActiveFireInstance, FireSmokeSystem, ScorchMark } from '../systems/Fire
 import { PoliticalPhaseSystem } from '../systems/PoliticalPhaseSystem';
 import { SectorSystem } from '../systems/SectorSystem';
 import { SpawnerSystem } from '../systems/SpawnerSystem';
+import { StaticLayerRecorder, StaticMapTiles, bakeStaticMapLayers } from '../systems/StaticMapTiles';
 import { SpeechBubble } from '../ui/SpeechBubble';
 import {
   DifficultyConfig,
@@ -166,6 +167,7 @@ export class GameScene extends Phaser.Scene {
   public fireSystem!: FireSmokeSystem;
   private forestTrees: ForestTree[] = [];
   private forestBushes: ForestBush[] = [];
+  private staticMapTiles: StaticMapTiles | null = null;
   private treeFireTimer = 0;
   private bushFireTimer = 0;
   public sectorSystem!: SectorSystem;
@@ -970,7 +972,7 @@ export class GameScene extends Phaser.Scene {
    * Totalmente alinhado aos eixos isométricos (sem círculos concêntricos).
    */
   private drawConcentricSantaremMap(): void {
-    const g = this.add.graphics().setDepth(1);
+    const g = new StaticLayerRecorder();
     const cx = WORLD_CENTER_X;
     const cy = WORLD_CENTER_Y;
 
@@ -1024,8 +1026,8 @@ export class GameScene extends Phaser.Scene {
 
     // Traçado viário ortogonal isométrico da Cidade:
     // Pistas de asfalto cinza escuro, linhas brancas tracejadas e quarteirões com gramado verde
-    const streetsGraphics = this.add.graphics().setDepth(2);
-    const markingsGraphics = this.add.graphics().setDepth(4);
+    const streetsGraphics = new StaticLayerRecorder();
+    const markingsGraphics = new StaticLayerRecorder();
 
     // Grid ortogonal isométrico ajustado para enquadramento idêntico à imagem de referência
     const streetStep = 240;
@@ -1111,7 +1113,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     // Estrada de terra circundando a zona rural, com 4 ligações às ruas da cidade (uma em cada lado)
-    const ruralRoadGraphics = this.add.graphics().setDepth(2);
+    const ruralRoadGraphics = new StaticLayerRecorder();
     const roadHalf = RURAL_ROAD.WIDTH / 2;
     const roadR = RURAL_ROAD.RADIUS;
     const roadLink = RURAL_ROAD.LINK_START;
@@ -1140,7 +1142,7 @@ export class GameScene extends Phaser.Scene {
     fillRoadRect(-roadR - roadHalf, -roadLink, -roadHalf, roadHalf);
 
     // Trilhas de terra estreitas pela floresta (sem árvores em cima, para dar passagem)
-    const trailGraphics = this.add.graphics().setDepth(2);
+    const trailGraphics = new StaticLayerRecorder();
     trailGraphics.lineStyle(FOREST_TRAIL.WIDTH, 0x7c5a34, 0.9);
     for (const path of ALL_TRAIL_PATHS) {
       trailGraphics.beginPath();
@@ -1151,6 +1153,15 @@ export class GameScene extends Phaser.Scene {
       });
       trailGraphics.strokePath();
     }
+
+    // Camadas estáticas viram blocos de Graphics que só são renderizados quando a câmera os vê
+    this.staticMapTiles = bakeStaticMapLayers(this, [
+      { recorder: g, depth: 1 },
+      { recorder: streetsGraphics, depth: 2 },
+      { recorder: markingsGraphics, depth: 4 },
+      { recorder: ruralRoadGraphics, depth: 2 },
+      { recorder: trailGraphics, depth: 2 }
+    ]);
 
     // 3. Casas populares de Santarém alinhadas nos quarteirões gramados (conforme imagem de referência)
     // Cada quarteirão possui fileiras organizadas de casas voltadas para a rua
@@ -1966,6 +1977,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   public override update(_time: number, deltaMs: number): void {
+    this.staticMapTiles?.updateVisibility(this.cameras.main);
     if (this.isEnding || this.isStoryModalOpen) return;
 
     this.gameTimeMs += deltaMs;
