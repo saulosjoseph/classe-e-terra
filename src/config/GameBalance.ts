@@ -51,7 +51,7 @@ export const COLLISION = {
   FARM_RADIUS: 12,
   BASE_BRIGADISTA_RADIUS: 110,
   BASE_BOMBEIROS_RADIUS: 110,
-  ALDEIA_RADIUS: 150
+  ALDEIA_RADIUS: 293
 } as const;
 
 /**
@@ -88,8 +88,9 @@ export const BASE_BOMBEIROS_Y = WORLD_CENTER_Y - 360;
 /** Aldeias indígenas: largura em px do mundo, recuo para dentro de cada vértice do losango e clareira de árvores */
 export const ALDEIA = {
   WIDTH: 500,
+  SCALE: 1.95,
   EDGE_INSET: 350,
-  CLEARING: 260
+  CLEARING: 507
 } as const;
 
 /** Uma aldeia em cada canto do losango da floresta (topo, direita, base e esquerda), recuada para dentro */

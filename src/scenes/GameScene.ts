@@ -113,6 +113,28 @@ function pickTreeVariant(): number {
   return TREE_SPRITE_VARIANTS;
 }
 
+/** Mato: arbustos e plantas rasteiras (mato_1 a mato_MATO_VARIANTS) espalhados por todo o mapa */
+interface ForestBush {
+  x: number;
+  y: number;
+  sprite: Phaser.GameObjects.Image;
+  state: 'healthy' | 'burning' | 'burned';
+  burnLeftMs: number;
+}
+
+const MATO_VARIANTS = 25;
+/** Quantidade de mato por setor (nasce fora de prédios e obstáculos) */
+const MATO_COUNT_BY_SECTOR: Record<SectorType, number> = {
+  [SectorType.CIDADE]: 60,
+  [SectorType.CAMPO]: 180,
+  [SectorType.FLORESTA]: 390
+};
+/** Escala e âncora (base da planta) dos sprites de mato, menores que as árvores */
+const MATO_SPRITE_SCALE = 0.4;
+const MATO_SPRITE_ORIGIN_Y = 0.9;
+/** Variação de mato que aparece em dobro (100% a mais de quantidade) */
+const MATO_DOUBLED_VARIANT = 23;
+
 /** Ponto onde os brigadistas nascem junto à Base dos Brigadistas (deslocamento em relação ao centro da base) */
 const BRIGADISTA_BASE_SPAWN_OFFSET = { x: -150, y: 120 };
 /** Ponto onde o caminhão dos bombeiros nasce, perto da Base dos Bombeiros (dentro do raio de recarga) */
@@ -123,7 +145,9 @@ export class GameScene extends Phaser.Scene {
   public phaseSystem!: PoliticalPhaseSystem;
   public fireSystem!: FireSmokeSystem;
   private forestTrees: ForestTree[] = [];
+  private forestBushes: ForestBush[] = [];
   private treeFireTimer = 0;
+  private bushFireTimer = 0;
   public sectorSystem!: SectorSystem;
   public spawnerSystem!: SpawnerSystem;
   public boss!: BossFortress;
@@ -212,7 +236,7 @@ export class GameScene extends Phaser.Scene {
     this.forestHealth = BALANCE.INITIAL_FOREST_HEALTH;
     this.forestDirectDamage = 0;
     this.forestTrees = [];
-    this.brigadistas = [];
+    this.forestBushes = [];
     this.bombeiros = [];
     this.guardas = [];
     this.trabalhadoresRurais = [];
@@ -1222,7 +1246,8 @@ export class GameScene extends Phaser.Scene {
     for (const pos of ALDEIA_POSITIONS) {
       const aldeiaSprite = this.add
         .sprite(pos.x, pos.y, 'aldeia')
-        .setOrigin(0.5, 0.5);
+        .setOrigin(0.5, 0.5)
+        .setScale(ALDEIA.SCALE);
       aldeiaSprite.setDepth(15 + Math.floor(pos.y));
       aldeiaSprite.setInteractive({ useHandCursor: true });
       aldeiaSprite.on('pointerup', (pointer: Phaser.Input.Pointer) => {
@@ -1246,6 +1271,28 @@ export class GameScene extends Phaser.Scene {
       }
       this.createForestTree(pt.x, pt.y);
     }
+
+    // Mato espalhado por todo o mapa, depois das árvores e dos prédios para não nascer sobre eles
+    for (const sector of [SectorType.CIDADE, SectorType.CAMPO, SectorType.FLORESTA]) {
+      for (let i = 0; i < MATO_COUNT_BY_SECTOR[sector]; i++) {
+        const variant = Phaser.Math.Between(1, MATO_VARIANTS);
+        const pt = this.findFreeMatoPoint(sector);
+        this.createForestBush(pt.x, pt.y, variant);
+        if (variant === MATO_DOUBLED_VARIANT) {
+          const extraPt = this.findFreeMatoPoint(sector);
+          this.createForestBush(extraPt.x, extraPt.y, variant);
+        }
+      }
+    }
+  }
+
+  /** Sorteia um ponto no setor que não esteja bloqueado por prédios ou obstáculos */
+  private findFreeMatoPoint(sector: SectorType): { x: number; y: number } {
+    let pt = getRandomPointInSector(sector, 24);
+    while (getCollisionSystem(this).isBlocked(pt.x, pt.y)) {
+      pt = getRandomPointInSector(sector, 24);
+    }
+    return pt;
   }
 
   /** Cria uma árvore de espécie sorteada em (x, y), como obstáculo e parte da floresta que pode queimar */
@@ -1301,6 +1348,53 @@ export class GameScene extends Phaser.Scene {
           tree.burnLeftMs = TREE_FIRE.BURN_DURATION_MS;
           this.applyTreeAppearance(tree);
           this.fireSystem.spawnFire(tree.x, tree.y, TREE_FIRE.INITIAL_INTENSITY);
+          break;
+        }
+      }
+    }
+  }
+
+  /** Cria um mato de variação sorteada em (x, y): não bloqueia a passagem, mas pode queimar */
+  private createForestBush(x: number, y: number, variant: number): void {
+    const sprite = this.add
+      .image(x, y, `mato_${variant}`)
+      .setOrigin(0.5, MATO_SPRITE_ORIGIN_Y)
+      .setScale(MATO_SPRITE_SCALE)
+      .setDepth(15 + Math.floor(y));
+    this.forestBushes.push({ x, y, sprite, state: 'healthy', burnLeftMs: 0 });
+  }
+
+  /**
+   * Mato perto de um foco ativo pega fogo (laranja) e, ao fim da queima, some e deixa solo queimado.
+   * Não entra na Saúde da Floresta nem no colapso, que contam apenas as árvores.
+   */
+  private updateForestBushes(deltaMs: number): void {
+    for (const bush of this.forestBushes) {
+      if (bush.state !== 'burning') continue;
+      bush.burnLeftMs -= deltaMs;
+      if (bush.burnLeftMs <= 0) {
+        bush.state = 'burned';
+        bush.sprite.destroy();
+        this.fireSystem.createScorchMark(bush.x, bush.y);
+      }
+    }
+
+    this.bushFireTimer += deltaMs;
+    if (this.bushFireTimer < TREE_FIRE.CHECK_INTERVAL_MS) return;
+    this.bushFireTimer = 0;
+
+    const fires = this.fireSystem.getActiveFires();
+    if (fires.length === 0) return;
+
+    for (const bush of this.forestBushes) {
+      if (bush.state !== 'healthy') continue;
+      for (const fire of fires) {
+        if (getIsoDistance(bush.x, bush.y, fire.data.x, fire.data.y) > TREE_FIRE.IGNITION_RADIUS) continue;
+        const chance = TREE_FIRE.IGNITION_CHANCE_PER_CHECK * (fire.data.intensity / 100);
+        if (Math.random() < chance) {
+          bush.state = 'burning';
+          bush.burnLeftMs = TREE_FIRE.BURN_DURATION_MS;
+          bush.sprite.setTint(0xff7a1a);
           break;
         }
       }
@@ -1843,6 +1937,7 @@ export class GameScene extends Phaser.Scene {
       this.phaseSystem.isIndigenousDemarcationActive()
     );
     this.updateForestTrees(deltaMs);
+    this.updateForestBushes(deltaMs);
 
     this.forestDirectDamage += forestDamage;
     this.forestHealth = this.computeForestHealth();

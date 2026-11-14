@@ -20,6 +20,10 @@ export class BootScene extends Phaser.Scene {
       this.load.image(`arvore_${variant}`, `assets/arvore_${variant}.png`);
       this.load.image(`arvore_queimada_${variant}`, `assets/arvore_queimada_${variant}.png`);
     }
+    // Variações de mato geradas por scripts/create_mato_sprites.js
+    for (let variant = 1; variant <= 25; variant++) {
+      this.load.image(`mato_${variant}`, `assets/mato_${variant}.png`);
+    }
     this.load.image('casa_rural', 'assets/casa_rural.png');
     this.load.image('base_bombeiros', 'assets/base_bombeiros.png');
     this.load.image('caminhao_bombeiros', 'assets/caminhao_bombeiros.png');
