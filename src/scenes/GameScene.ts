@@ -86,6 +86,8 @@ interface ForestTree {
   sprite: Phaser.GameObjects.Sprite;
   state: 'healthy' | 'burning' | 'burned';
   burnLeftMs: number;
+  /** Marca visual do solo queimado (solo preto e fumaça), removida ao replantar */
+  scorch: Phaser.GameObjects.GameObject[];
 }
 
 /** Ponto onde os brigadistas nascem junto à Base dos Brigadistas (deslocamento em relação ao centro da base) */
@@ -106,6 +108,8 @@ export class GameScene extends Phaser.Scene {
   private followedTarget: FollowableTarget | null = null;
 
   private forestHealth = BALANCE.INITIAL_FOREST_HEALTH;
+  /** Dano direto do fogo fora das árvores, acumulado na partida (não se recupera) */
+  private forestDirectDamage = 0;
   private brigadistas: Brigadista[] = [];
   private bombeiros: Bombeiro[] = [];
   private guardas: GuardaFlorestal[] = [];
@@ -181,6 +185,8 @@ export class GameScene extends Phaser.Scene {
     const diffLevel = data?.difficulty ?? DifficultyLevel.NORMAL;
     this.difficulty = DIFFICULTY_CONFIGS[diffLevel];
     this.forestHealth = BALANCE.INITIAL_FOREST_HEALTH;
+    this.forestDirectDamage = 0;
+    this.forestTrees = [];
     this.brigadistas = [];
     this.bombeiros = [];
     this.guardas = [];
@@ -1098,6 +1104,19 @@ export class GameScene extends Phaser.Scene {
       getCollisionSystem(this).addObstacle(pt.x, pt.y, COLLISION.FARM_RADIUS);
     }
 
+    // Árvores da zona rural (CAMPO): entram em forestTrees, podendo pegar fogo como as da floresta
+    for (let i = 0; i < 30; i++) {
+      const pt = getRandomPointInSector(SectorType.CAMPO, 36);
+      const sprite = this.add
+        .sprite(pt.x, pt.y, 'prop_tree')
+        .setOrigin(0.5, 0.92)
+        .setScale(3)
+        .setDepth(15 + Math.floor(pt.y))
+        .setAlpha(0.98);
+      getCollisionSystem(this).addObstacle(pt.x, pt.y, COLLISION.TREE_RADIUS);
+      this.forestTrees.push({ x: pt.x, y: pt.y, sprite, state: 'healthy', burnLeftMs: 0, scorch: [] });
+    }
+
     // Sede dos Brigadistas Voluntários no anel da Floresta (noroeste, distância isométrica ~3400)
     const baseX = BASE_BRIGADISTA_X;
     const baseY = BASE_BRIGADISTA_Y;
@@ -1160,7 +1179,7 @@ export class GameScene extends Phaser.Scene {
         .setDepth(15 + Math.floor(pt.y))
         .setAlpha(0.98);
       getCollisionSystem(this).addObstacle(pt.x, pt.y, COLLISION.TREE_RADIUS);
-      this.forestTrees.push({ x: pt.x, y: pt.y, sprite, state: 'healthy', burnLeftMs: 0 });
+      this.forestTrees.push({ x: pt.x, y: pt.y, sprite, state: 'healthy', burnLeftMs: 0, scorch: [] });
     }
   }
 
@@ -1172,6 +1191,7 @@ export class GameScene extends Phaser.Scene {
       if (tree.burnLeftMs <= 0) {
         tree.state = 'burned';
         tree.sprite.setTint(0x3f3f46);
+        this.markScorchedGround(tree);
       }
     }
 
@@ -1231,7 +1251,6 @@ export class GameScene extends Phaser.Scene {
   private registerEvents(): void {
     this.fireSystem.on('fire-extinguished', () => {
       this.firesExtinguished++;
-      this.phaseSystem.addConsciousness(1, 'Foco de incêndio contido');
     });
 
     this.boss.on('boss-defeated', () => {
@@ -1529,8 +1548,55 @@ export class GameScene extends Phaser.Scene {
     return this.forestHealth;
   }
 
-  public healForest(amount: number): void {
-    this.forestHealth = Phaser.Math.Clamp(this.forestHealth + amount, 0, 100);
+  /** Fração das árvores queimadas até o colapso (0 sem queimadas, 1 quando a floresta colapsa) */
+  private getTreeLossRatio(): number {
+    const total = this.forestTrees.length;
+    if (total === 0) return 0;
+    const burned = this.forestTrees.filter((tree) => tree.state === 'burned').length;
+    return Phaser.Math.Clamp(burned / (total * TREE_FIRE.COLLAPSE_BURNED_RATIO), 0, 1);
+  }
+
+  /**
+   * Saúde da floresta: as árvores pesam TREE_HEALTH_WEIGHT e o dano direto do fogo pesa o restante.
+   * Sem o colapso das árvores a saúde nunca chega a 0, pois a perda máxima fica abaixo de 100%.
+   */
+  private computeForestHealth(): number {
+    const treeRatio = this.getTreeLossRatio();
+    if (treeRatio >= 1) return 0;
+    const directRatio = Phaser.Math.Clamp(this.forestDirectDamage / TREE_FIRE.DIRECT_DAMAGE_FULL, 0, 1);
+    const loss =
+      TREE_FIRE.TREE_HEALTH_WEIGHT * treeRatio + (1 - TREE_FIRE.TREE_HEALTH_WEIGHT) * directRatio;
+    return Phaser.Math.Clamp(100 * (1 - loss), 0, 100);
+  }
+
+  /** Solo preto e fumaça preta persistentes no lugar de uma árvore carbonizada */
+  private markScorchedGround(tree: ForestTree): void {
+    tree.scorch = this.fireSystem.createScorchMark(tree.x, tree.y);
+  }
+
+  /** Replanta árvores queimadas (até maxTrees), restaurando o solo e a saúde associada */
+  private replantTrees(maxTrees: number): number {
+    let replanted = 0;
+    for (const tree of this.forestTrees) {
+      if (replanted >= maxTrees) break;
+      if (tree.state !== 'burned') continue;
+      for (const obj of tree.scorch) obj.destroy();
+      tree.scorch = [];
+      tree.sprite.clearTint();
+      tree.state = 'healthy';
+      replanted++;
+    }
+    return replanted;
+  }
+
+  /** Reflorestamento: recupera `points` pontos de saúde replantando as árvores que correspondem à parcela das árvores */
+  public replantForest(points: number): void {
+    const treePoints = points / TREE_FIRE.TREE_HEALTH_WEIGHT;
+    const treesNeeded = Math.round(
+      (treePoints / 100) * this.forestTrees.length * TREE_FIRE.COLLAPSE_BURNED_RATIO
+    );
+    this.replantTrees(treesNeeded);
+    this.forestHealth = this.computeForestHealth();
   }
 
   public triggerIntegratedAction(type: IntegratedActionType): boolean {
@@ -1549,7 +1615,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   public triggerLocalAction(type: LocalActionType): boolean {
-    return this.sectorSystem.executeLocalAction(type, (heal) => this.healForest(heal));
+    return this.sectorSystem.executeLocalAction(type, (points) => this.replantForest(points));
   }
 
   private captureArsonist(arsonist: Incendiario): void {
@@ -1685,7 +1751,8 @@ export class GameScene extends Phaser.Scene {
     );
     this.updateForestTrees(deltaMs);
 
-    this.forestHealth = Phaser.Math.Clamp(this.forestHealth - forestDamage, 0, 100);
+    this.forestDirectDamage += forestDamage;
+    this.forestHealth = this.computeForestHealth();
 
     this.boss.update(deltaMs, () => {
       this.spawnerSystem.spawnArsonist(SectorType.FLORESTA);
@@ -1695,7 +1762,7 @@ export class GameScene extends Phaser.Scene {
     if (this.forestHealth <= 0) {
       this.triggerGameOver(
         false,
-        'A Saúde da Floresta chegou a 0%. A fumaça negra absoluta e o fogo consumiram o território do Tapajós.'
+        `Mais de ${Math.round(TREE_FIRE.COLLAPSE_BURNED_RATIO * 100)}% das árvores da floresta queimaram. A fumaça negra absoluta consumiu o território do Tapajós.`
       );
     }
   }

@@ -193,7 +193,7 @@ export class SectorSystem extends Phaser.Events.EventEmitter {
    */
   public executeLocalAction(
     type: LocalActionType,
-    onHealForest: (amount: number) => void
+    onReplantForest: (points: number) => void
   ): boolean {
     if (!this.isActionReady(type)) return false;
 
@@ -225,7 +225,7 @@ export class SectorSystem extends Phaser.Events.EventEmitter {
 
       case LocalActionType.FLORESTA_REFLORESTAMENTO: {
         this.triggerCooldown(type, BALANCE.COOLDOWNS.LOCAL_FLORESTA_REFLORESTAR, SectorType.FLORESTA);
-        onHealForest(12);
+        onReplantForest(12);
         const pt = getRandomPointInSector(SectorType.FLORESTA, 60);
         this.spawnFloatingText(pt.x, pt.y, '🌱 Reflorestamento +12% Mata!', '#4ade80');
         break;

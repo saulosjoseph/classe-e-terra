@@ -26,9 +26,7 @@ export class SpawnerSystem extends Phaser.Events.EventEmitter {
     return this.arsonists;
   }
 
-  public spawnArsonist(targetSector?: SectorType): Incendiario | null {
-    if (this.getArsonists().length >= 7) return null;
-
+  public spawnArsonist(targetSector?: SectorType): Incendiario {
     // Surgem na borda externa do anel da Floresta e infiltram-se no setor alvo
     const sector =
       targetSector ??

@@ -101,6 +101,9 @@ export class FireSmokeSystem extends Phaser.Events.EventEmitter {
       .setInteractive({ useHandCursor: true })
       .setDepth(35);
 
+    // Persistente: permanece no solo mesmo após o fogo ser apagado
+    this.createScorchMark(clampedX, clampedY);
+
     const data: FireNodeData = {
       id,
       x: clampedX,
@@ -129,6 +132,22 @@ export class FireSmokeSystem extends Phaser.Events.EventEmitter {
     SoundManager.playFireStart();
     this.updateFireVisuals(instance);
     return instance;
+  }
+
+  /** Solo preto e fumaça preta que marcam um ponto queimado; quem chama decide quando destruí-los */
+  public createScorchMark(x: number, y: number): Phaser.GameObjects.GameObject[] {
+    const ground = this.scene.add.graphics().setDepth(3);
+    ground.fillStyle(0x0c0a09, 0.85);
+    ground.fillEllipse(x, y, 70, 35, 24);
+
+    const smoke = this.scene.add
+      .sprite(x, y - 30, 'smoke_4')
+      .setOrigin(0.5, 0.8)
+      .setScale(0.9)
+      .setAlpha(0.55)
+      .setDepth(15 + Math.floor(y) + 1);
+
+    return [ground, smoke];
   }
 
   public extinguishFire(id: string, amount: number): boolean {

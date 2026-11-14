@@ -5,6 +5,8 @@ import {
   ISO_Y_RATIO,
   WORLD_CENTER_X,
   WORLD_CENTER_Y,
+  WORLD_HEIGHT,
+  WORLD_WIDTH,
   getIsoDistance
 } from '../config/GameBalance';
 import { FireSmokeSystem } from '../systems/FireSmokeSystem';
@@ -13,6 +15,7 @@ import { createNavRoute, getCollisionSystem, NavRoute } from '../systems/Collisi
 /**
  * Os Incendiários (Agentes do Caos):
  * Surgem nas bordas externas e pontos cegos da mata, entram para atear fogo e tentam fugir de volta para a borda externa.
+ * Ao chegar à borda, seguem para fora do mapa e são removidos.
  */
 export class Incendiario extends Phaser.Events.EventEmitter {
   public readonly id: string;
@@ -28,10 +31,12 @@ export class Incendiario extends Phaser.Events.EventEmitter {
   private targetY: number;
   private escapeX: number;
   private escapeY: number;
+  private escapeAngle: number;
   private speed = 100;
   private escapeSpeed = 150;
   private hasIgnited = false;
   private igniteWarmupMs = 1500;
+  private exiting = false;
   private alive = true;
   private isFollowed = false;
   private navRoute: NavRoute = createNavRoute();
@@ -54,9 +59,9 @@ export class Incendiario extends Phaser.Events.EventEmitter {
     this.targetX = blindSpot.x;
     this.targetY = blindSpot.y;
 
-    const escapeAngle = Math.atan2((spawnY - WORLD_CENTER_Y) * ISO_INVERSE_Y_RATIO, spawnX - WORLD_CENTER_X);
-    const escapeRawX = WORLD_CENTER_X + Math.cos(escapeAngle) * (FLORESTA_OUTER_RADIUS + 50);
-    const escapeRawY = WORLD_CENTER_Y + Math.sin(escapeAngle) * ((FLORESTA_OUTER_RADIUS + 50) * ISO_Y_RATIO);
+    this.escapeAngle = Math.atan2((spawnY - WORLD_CENTER_Y) * ISO_INVERSE_Y_RATIO, spawnX - WORLD_CENTER_X);
+    const escapeRawX = WORLD_CENTER_X + Math.cos(this.escapeAngle) * (FLORESTA_OUTER_RADIUS + 50);
+    const escapeRawY = WORLD_CENTER_Y + Math.sin(this.escapeAngle) * ((FLORESTA_OUTER_RADIUS + 50) * ISO_Y_RATIO);
     const escape = collision.snapToFree(escapeRawX, escapeRawY);
     this.escapeX = escape.x;
     this.escapeY = escape.y;
@@ -133,6 +138,21 @@ export class Incendiario extends Phaser.Events.EventEmitter {
     this.sprite.play('incendiario_walk', true);
   }
 
+  /** Anda na direção radial da fuga, sem navegação, até sair do mapa */
+  private stepOutward(stepLen: number): void {
+    const prevX = this.x;
+    this.x += Math.cos(this.escapeAngle) * stepLen;
+    this.y += Math.sin(this.escapeAngle) * stepLen * ISO_Y_RATIO;
+    if (Math.abs(this.x - prevX) > 0.05) {
+      this.sprite.setFlipX(this.x < prevX);
+    }
+    this.sprite.play('incendiario_walk', true);
+  }
+
+  private isOutsideMap(): boolean {
+    return this.x < 0 || this.x > WORLD_WIDTH || this.y < 0 || this.y > WORLD_HEIGHT;
+  }
+
   public update(deltaMs: number, fireSystem: FireSmokeSystem): void {
     if (!this.alive) return;
     const dtSec = deltaMs / 1000;
@@ -150,14 +170,20 @@ export class Incendiario extends Phaser.Events.EventEmitter {
           fireSystem.spawnFire(this.x, this.y, 24);
         }
       }
-    } else {
-      // Tenta fugir pelas bordas após atear fogo
-      const distEscape = getIsoDistance(this.x, this.y, this.escapeX, this.escapeY);
-      if (distEscape <= 12) {
+    } else if (this.exiting) {
+      this.stepOutward(this.escapeSpeed * dtSec);
+      if (this.isOutsideMap()) {
         this.destroy();
         return;
       }
-      this.advance(this.escapeX, this.escapeY, this.escapeSpeed * dtSec);
+    } else {
+      // Tenta fugir pelas bordas após atear fogo; ao chegar à borda, segue para fora do mapa
+      const distEscape = getIsoDistance(this.x, this.y, this.escapeX, this.escapeY);
+      if (distEscape <= 12) {
+        this.exiting = true;
+      } else {
+        this.advance(this.escapeX, this.escapeY, this.escapeSpeed * dtSec);
+      }
     }
 
     const yDepth = 20 + Math.floor(this.y);
@@ -168,8 +194,10 @@ export class Incendiario extends Phaser.Events.EventEmitter {
   }
 
   public destroy(): void {
+    this.alive = false;
     this.sprite.destroy();
     this.shadowSprite.destroy();
     this.hitZone.destroy();
+    this.selectionRing.destroy();
   }
 }

@@ -23,10 +23,10 @@ export const MAP_TOP_Y = HUD_TOP_HEIGHT;
 export const MAP_BOTTOM_Y = GAME_HEIGHT - HUD_BOTTOM_HEIGHT; // 323
 export const MAP_VIEWPORT_HEIGHT = MAP_BOTTOM_Y - MAP_TOP_Y; // 269
 
-export const WORLD_WIDTH = 10400;
-export const WORLD_HEIGHT = 8000;
-export const WORLD_CENTER_X = WORLD_WIDTH / 2; // 5200
-export const WORLD_CENTER_Y = WORLD_HEIGHT / 2; // 4000
+export const WORLD_WIDTH = 11152;
+export const WORLD_HEIGHT = 8580;
+export const WORLD_CENTER_X = WORLD_WIDTH / 2; // 5576
+export const WORLD_CENTER_Y = WORLD_HEIGHT / 2; // 4290
 
 /** Proporção dimétrica 2:1 da Visão Isométrica clássica (RTS / Pixel Art) */
 export const ISO_Y_RATIO = 0.5;
@@ -34,8 +34,9 @@ export const ISO_INVERSE_Y_RATIO = 2.0;
 
 /** Cidade quadruplicada em tamanho (raio de 1960px: malha viária de 1920px + margem) */
 export const CITY_RADIUS = 1960;
-export const CAMPO_RADIUS = 2800;
-export const FLORESTA_OUTER_RADIUS = 5000;
+/** Área do anel do Campo +21% sobre o original e Floresta +20% sobre a atual (mundo escalado junto) */
+export const CAMPO_RADIUS = 3027.1;
+export const FLORESTA_OUTER_RADIUS = 5361.7;
 
 /**
  * Colisão no solo: célula da grade de navegação e raios (no plano do solo) dos obstáculos fixos.
@@ -57,13 +58,19 @@ export const COLLISION = {
  * Fogo nas árvores da floresta: uma árvore saudável pega fogo quando está a até IGNITION_RADIUS
  * (distância isométrica, 3 tiles de 64 px) de um foco ativo. A chance por verificação escala com a intensidade do foco.
  * Depois de queimar, a árvore fica carbonizada e continua bloqueando a passagem.
+ * A Saúde da Floresta combina as árvores queimadas (peso TREE_HEALTH_WEIGHT) com o dano direto do fogo
+ * (peso restante, acumulado até DIRECT_DAMAGE_FULL). Ela só chega a 0% quando COLLAPSE_BURNED_RATIO das árvores
+ * estiverem queimadas, pois o dano direto sozinho nunca zera a saúde.
  */
 export const TREE_FIRE = {
   IGNITION_RADIUS: 192,
   CHECK_INTERVAL_MS: 500,
   IGNITION_CHANCE_PER_CHECK: 0.35,
   BURN_DURATION_MS: 8000,
-  INITIAL_INTENSITY: 22
+  INITIAL_INTENSITY: 22,
+  COLLAPSE_BURNED_RATIO: 0.75,
+  TREE_HEALTH_WEIGHT: 0.8,
+  DIRECT_DAMAGE_FULL: 100
 } as const;
 
 export const CITY_RADIUS_Y = CITY_RADIUS * ISO_Y_RATIO; // 920
@@ -280,7 +287,7 @@ export const POLITICAL_PHASES: PoliticalPhaseDefinition[] = [
 ];
 
 export const BALANCE = {
-  INITIAL_FOREST_HEALTH: 50000,
+  INITIAL_FOREST_HEALTH: 100,
   INITIAL_CONSCIOUSNESS: 0,
   MAX_CONSCIOUSNESS: 100,
   /** Cooldowns base em milissegundos */
