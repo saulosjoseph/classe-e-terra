@@ -4,7 +4,7 @@ import { ActiveFireInstance, FireSmokeSystem } from '../systems/FireSmokeSystem'
 import { UnitType } from '../types/GameTypes';
 import { Unit } from './Unit';
 
-export type TrabalhadorRuralVariant = 'a' | 'b';
+export type TrabalhadorRuralVariant = 'a' | 'b' | 'c';
 
 /**
  * Trabalhador Rural da zona rural: apaga focos de fogo em todo o mapa,
@@ -28,7 +28,7 @@ export class TrabalhadorRural extends Unit {
     this.restX = x;
     this.restY = y;
     this.baseSpeed = BALANCE.TRABALHADOR_RURAL.SPEED;
-    this.sprite.setScale(0.48);
+    this.sprite.setScale(variant === 'c' ? 0.48 * 0.7 : 0.48);
     this.sprite.setOrigin(0.5, 0.9375);
     this.statusBarOffsetY = 62;
     this.sprite.play(`${this.animPrefix()}_idle`);

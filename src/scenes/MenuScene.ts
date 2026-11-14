@@ -56,7 +56,7 @@ export class MenuScene extends Phaser.Scene {
     this.add.sprite(240, 96, 'brigada_comunitaria', 0).setScale(0.9);
     this.add.sprite(360, 96, 'prop_farm').setScale(1.2);
     this.add.sprite(480, 96, 'unit_guarda').setScale(1.2);
-    this.add.sprite(600, 96, 'prop_tree').setScale(1.3);
+    this.add.sprite(600, 96, 'arvore_1').setScale(0.3);
 
     // Coluna Esquerda (x = 195): Seleção de Dificuldade (afeta ganho das Ações Integradas)
     const leftX = 198;

@@ -11,7 +11,6 @@ export class PixelArtGenerator {
     this.generateHDShadow(scene);
     this.generateHDVoluntario(scene);
     this.generateHDGuarda(scene);
-    this.generateHDTree(scene);
     this.generateHDFarm(scene);
     this.generateHDCityHouse(scene);
     this.generateHDBoss(scene);
@@ -212,71 +211,6 @@ export class PixelArtGenerator {
     this.line(ctx, 19, 42, 25, 42, '#27272a');
 
     this.finalizeCanvas(scene, 'unit_guarda');
-  }
-
-  // 7. Samaúma / Castanheira Majestosa do Tapajós HD (64x72: copa densa multicamadas, sapopembas e bromélias)
-  private static generateHDTree(scene: Phaser.Scene): void {
-    const ctx = this.initCanvas(scene, 'prop_tree', 64, 72);
-    if (!ctx) return;
-
-    // Sombra da árvore no chão
-    ctx.fillStyle = '#090d0a55';
-    ctx.beginPath();
-    ctx.ellipse(32, 66, 24, 6, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Raízes tabulares gigantescas (Sapopembas) ancorando o tronco no solo isométrico
-    this.poly(ctx, [[28, 48], [24, 66], [16, 68], [26, 62]], '#451a03');
-    this.poly(ctx, [[36, 48], [40, 66], [48, 68], [38, 62]], '#451a03');
-    this.poly(ctx, [[30, 48], [32, 67], [34, 67], [34, 48]], '#78350f');
-
-    // Tronco maciço com ranhuras e casca amazônica
-    this.rect(ctx, 28, 44, 8, 18, '#78350f');
-    this.line(ctx, 29, 44, 29, 62, '#451a03');
-    this.line(ctx, 32, 44, 32, 62, '#a16207');
-    this.line(ctx, 34, 44, 34, 62, '#451a03');
-
-    // Bromélia na forquilha do galho
-    this.px(ctx, 27, 44, '#ef4444');
-    this.px(ctx, 26, 43, '#22c55e');
-    this.px(ctx, 28, 43, '#22c55e');
-
-    // Copa volumosa em domos esféricos - Camada 1: Sombra profunda da mata
-    ctx.fillStyle = '#022c22';
-    ctx.beginPath();
-    ctx.ellipse(32, 28, 28, 22, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Camada 2: Verde floresta escuro
-    ctx.fillStyle = '#064e3b';
-    ctx.beginPath();
-    ctx.ellipse(22, 26, 18, 16, 0, 0, Math.PI * 2);
-    ctx.ellipse(42, 26, 18, 16, 0, 0, Math.PI * 2);
-    ctx.ellipse(32, 18, 20, 16, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Camada 3: Verde médio vivo das copas
-    ctx.fillStyle = '#15803d';
-    ctx.beginPath();
-    ctx.ellipse(20, 22, 13, 12, 0, 0, Math.PI * 2);
-    ctx.ellipse(32, 15, 14, 12, 0, 0, Math.PI * 2);
-    ctx.ellipse(44, 22, 13, 12, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Camada 4: Luz solar filtrada nas folhas superiores
-    ctx.fillStyle = '#22c55e';
-    ctx.beginPath();
-    ctx.ellipse(19, 18, 8, 7, 0, 0, Math.PI * 2);
-    ctx.ellipse(32, 11, 9, 8, 0, 0, Math.PI * 2);
-    ctx.ellipse(43, 18, 8, 7, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Camada 5: Destaques de brotos e folhas novas
-    this.px(ctx, 18, 16, '#4ade80'); this.px(ctx, 19, 15, '#4ade80');
-    this.px(ctx, 31, 9, '#4ade80'); this.px(ctx, 32, 8, '#4ade80');
-    this.px(ctx, 42, 16, '#4ade80'); this.px(ctx, 43, 15, '#4ade80');
-
-    this.finalizeCanvas(scene, 'prop_tree');
   }
 
   // 8. Palafita Ribeirinha e Roçado do Campo HD (64x64: palafita de madeira, telhado de palha, varanda e cultivo)

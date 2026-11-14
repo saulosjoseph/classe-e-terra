@@ -85,9 +85,32 @@ interface ForestTree {
   y: number;
   sprite: Phaser.GameObjects.Sprite;
   state: 'healthy' | 'burning' | 'burned';
+  /** Espécie da árvore (1 a TREE_SPRITE_VARIANTS): usa o sprite saudável e o queimado de mesmo número */
+  variant: number;
   burnLeftMs: number;
   /** Marca visual do solo queimado (solo preto e fumaça), removida ao replantar */
   scorch: Phaser.GameObjects.GameObject[];
+}
+
+/** Quantidade de espécies de árvore (arvore_N e arvore_queimada_N) */
+const TREE_SPRITE_VARIANTS = 5;
+/** Peso de sorteio de cada espécie: 1 samaúma, 2 palmeira, 3 árvore de frutos, 4 guaraná, 5 mangueira */
+const TREE_SPRITE_WEIGHTS = [25, 40, 25, 10, 20];
+/** Escala e âncora (base do tronco) dos sprites de árvore */
+const TREE_SPRITE_SCALE = 0.75;
+const TREE_SPRITE_ORIGIN_Y = 0.92;
+/** Fator de escala por espécie: a mangueira (variante 5) é 30% menor */
+const TREE_SPRITE_SCALE_BY_VARIANT: Record<number, number> = { 5: 0.7 };
+
+/** Sorteia uma espécie (1 a TREE_SPRITE_VARIANTS) respeitando TREE_SPRITE_WEIGHTS */
+function pickTreeVariant(): number {
+  const total = TREE_SPRITE_WEIGHTS.reduce((sum, w) => sum + w, 0);
+  let roll = Phaser.Math.Between(1, total);
+  for (let variant = 1; variant <= TREE_SPRITE_VARIANTS; variant++) {
+    roll -= TREE_SPRITE_WEIGHTS[variant - 1];
+    if (roll <= 0) return variant;
+  }
+  return TREE_SPRITE_VARIANTS;
 }
 
 /** Ponto onde os brigadistas nascem junto à Base dos Brigadistas (deslocamento em relação ao centro da base) */
@@ -1160,16 +1183,9 @@ export class GameScene extends Phaser.Scene {
     }
 
     // Árvores da zona rural (CAMPO): entram em forestTrees, podendo pegar fogo como as da floresta
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; i < 60; i++) {
       const pt = getRandomPointInSector(SectorType.CAMPO, 36);
-      const sprite = this.add
-        .sprite(pt.x, pt.y, 'prop_tree')
-        .setOrigin(0.5, 0.92)
-        .setScale(3)
-        .setDepth(15 + Math.floor(pt.y))
-        .setAlpha(0.98);
-      getCollisionSystem(this).addObstacle(pt.x, pt.y, COLLISION.TREE_RADIUS);
-      this.forestTrees.push({ x: pt.x, y: pt.y, sprite, state: 'healthy', burnLeftMs: 0, scorch: [] });
+      this.createForestTree(pt.x, pt.y);
     }
 
     // Sede dos Brigadistas Voluntários no anel da Floresta (noroeste, distância isométrica ~3400)
@@ -1220,7 +1236,7 @@ export class GameScene extends Phaser.Scene {
     // Props da FLORESTA QUADRADA ISOMÉTRICA (Samaúmas e Castanheiras)
     // Clareira ao redor da sede: nenhuma árvore nasce sobre o prédio
     const baseClearing = 260;
-    for (let i = 0; i < 200; i++) {
+    for (let i = 0; i < 800; i++) {
       let pt = getRandomPointInSector(SectorType.FLORESTA, 40);
       while (
         getIsoDistance(pt.x, pt.y, baseX, baseY) < baseClearing ||
@@ -1228,14 +1244,31 @@ export class GameScene extends Phaser.Scene {
       ) {
         pt = getRandomPointInSector(SectorType.FLORESTA, 40);
       }
-      const sprite = this.add
-        .sprite(pt.x, pt.y, 'prop_tree')
-        .setOrigin(0.5, 0.92)
-        .setScale(3)
-        .setDepth(15 + Math.floor(pt.y))
-        .setAlpha(0.98);
-      getCollisionSystem(this).addObstacle(pt.x, pt.y, COLLISION.TREE_RADIUS);
-      this.forestTrees.push({ x: pt.x, y: pt.y, sprite, state: 'healthy', burnLeftMs: 0, scorch: [] });
+      this.createForestTree(pt.x, pt.y);
+    }
+  }
+
+  /** Cria uma árvore de espécie sorteada em (x, y), como obstáculo e parte da floresta que pode queimar */
+  private createForestTree(x: number, y: number): void {
+    const variant = pickTreeVariant();
+    const sprite = this.add
+      .sprite(x, y, `arvore_${variant}`)
+      .setOrigin(0.5, TREE_SPRITE_ORIGIN_Y)
+      .setScale(TREE_SPRITE_SCALE * (TREE_SPRITE_SCALE_BY_VARIANT[variant] ?? 1))
+      .setDepth(15 + Math.floor(y))
+      .setAlpha(0.98);
+    getCollisionSystem(this).addObstacle(x, y, COLLISION.TREE_RADIUS);
+    this.forestTrees.push({ x, y, sprite, state: 'healthy', variant, burnLeftMs: 0, scorch: [] });
+  }
+
+  /** Mostra a árvore conforme o estado: saudável, em chamas (tint laranja) ou queimada (sprite carbonizado) */
+  private applyTreeAppearance(tree: ForestTree): void {
+    const key = tree.state === 'burned' ? `arvore_queimada_${tree.variant}` : `arvore_${tree.variant}`;
+    tree.sprite.setTexture(key).setOrigin(0.5, TREE_SPRITE_ORIGIN_Y);
+    if (tree.state === 'burning') {
+      tree.sprite.setTint(0xff7a1a);
+    } else {
+      tree.sprite.clearTint();
     }
   }
 
@@ -1246,7 +1279,7 @@ export class GameScene extends Phaser.Scene {
       tree.burnLeftMs -= deltaMs;
       if (tree.burnLeftMs <= 0) {
         tree.state = 'burned';
-        tree.sprite.setTint(0x3f3f46);
+        this.applyTreeAppearance(tree);
         this.markScorchedGround(tree);
       }
     }
@@ -1266,7 +1299,7 @@ export class GameScene extends Phaser.Scene {
         if (Math.random() < chance) {
           tree.state = 'burning';
           tree.burnLeftMs = TREE_FIRE.BURN_DURATION_MS;
-          tree.sprite.setTint(0xff7a1a);
+          this.applyTreeAppearance(tree);
           this.fireSystem.spawnFire(tree.x, tree.y, TREE_FIRE.INITIAL_INTENSITY);
           break;
         }
@@ -1447,9 +1480,11 @@ export class GameScene extends Phaser.Scene {
     const targetCount = Math.max(MIN_COUNT, Math.ceil(activeFires / FIRES_PER_WORKER));
 
     while (this.trabalhadoresRurais.length < targetCount) {
-      const countA = this.trabalhadoresRurais.filter((t) => t.variant === 'a').length;
-      const countB = this.trabalhadoresRurais.length - countA;
-      const variant: TrabalhadorRuralVariant = countA <= countB ? 'a' : 'b';
+      const countOf = (v: TrabalhadorRuralVariant) =>
+        this.trabalhadoresRurais.filter((t) => t.variant === v).length;
+      const variant = (['a', 'b', 'c'] as TrabalhadorRuralVariant[]).reduce((best, v) =>
+        countOf(v) < countOf(best) ? v : best
+      );
       const pt = getRandomPointInSector(SectorType.CAMPO, 36);
       this.spawnTrabalhadorRuralUnit(pt.x, pt.y, variant);
     }
@@ -1639,8 +1674,8 @@ export class GameScene extends Phaser.Scene {
       if (tree.state !== 'burned') continue;
       for (const obj of tree.scorch) obj.destroy();
       tree.scorch = [];
-      tree.sprite.clearTint();
       tree.state = 'healthy';
+      this.applyTreeAppearance(tree);
       replanted++;
     }
     return replanted;

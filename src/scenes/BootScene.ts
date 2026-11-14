@@ -16,6 +16,10 @@ export class BootScene extends Phaser.Scene {
     this.load.image('smoke_3', 'assets/smoke_3.png');
     this.load.image('smoke_4', 'assets/smoke_4.png');
     this.load.image('solo_queimado', 'assets/solo_queimado.png');
+    for (let variant = 1; variant <= 5; variant++) {
+      this.load.image(`arvore_${variant}`, `assets/arvore_${variant}.png`);
+      this.load.image(`arvore_queimada_${variant}`, `assets/arvore_queimada_${variant}.png`);
+    }
     this.load.image('casa_rural', 'assets/casa_rural.png');
     this.load.image('base_bombeiros', 'assets/base_bombeiros.png');
     this.load.image('caminhao_bombeiros', 'assets/caminhao_bombeiros.png');
@@ -38,6 +42,11 @@ export class BootScene extends Phaser.Scene {
     this.load.spritesheet('trabalhador_rural_b', 'assets/trabalhador_rural_b.png', {
       frameWidth: 128,
       frameHeight: 128
+    });
+    // Frames gerados por scripts/create_trabalhador_rural_c_spritesheet.js: 0-2 enxada parado, 3-6 caminhada, 7-9 cavar
+    this.load.spritesheet('trabalhador_rural_c', 'assets/trabalhador_rural_c.png', {
+      frameWidth: 130,
+      frameHeight: 185
     });
     this.load.spritesheet('incendiario', 'assets/incendiario.png', {
       frameWidth: 128,
@@ -82,7 +91,8 @@ export class BootScene extends Phaser.Scene {
   private createTrabalhadorRuralAnimations(): void {
     const variants = [
       { key: 'trabalhador_rural_a', walk: [1, 2, 3, 4, 5], extinguish: [6, 7, 8] },
-      { key: 'trabalhador_rural_b', walk: [1, 2, 3], extinguish: [4, 5] }
+      { key: 'trabalhador_rural_b', walk: [1, 2, 3], extinguish: [4, 5] },
+      { key: 'trabalhador_rural_c', walk: [3, 4, 5, 6], extinguish: [7, 8, 9] }
     ];
 
     for (const variant of variants) {
