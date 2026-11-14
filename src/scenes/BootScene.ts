@@ -24,6 +24,10 @@ export class BootScene extends Phaser.Scene {
     for (let variant = 1; variant <= 25; variant++) {
       this.load.image(`mato_${variant}`, `assets/mato_${variant}.png`);
     }
+    // Variações de pedras (recortadas da folha de sprites de pedras)
+    for (let variant = 1; variant <= 9; variant++) {
+      this.load.image(`pedra_${variant}`, `assets/pedra_${variant}.png`);
+    }
     this.load.image('casa_rural', 'assets/casa_rural.png');
     this.load.image('base_bombeiros', 'assets/base_bombeiros.png');
     this.load.image('caminhao_bombeiros', 'assets/caminhao_bombeiros.png');

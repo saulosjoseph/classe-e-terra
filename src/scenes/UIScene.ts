@@ -959,7 +959,7 @@ export class UIScene extends Phaser.Scene {
         boxY - 40,
         this.gameScene.phaseSystem.isAjusteFiscalActive()
           ? 'Durante o Ajuste Fiscal, a base forma no máximo 1 bombeiro, com seu caminhão. Ele perde energia fora da base e volta para recarregar.'
-          : 'A base forma um novo bombeiro a cada 2 minutos, até o limite de bombeiros. Cada bombeiro vem com seu caminhão e perde energia fora da base.',
+          : 'A base forma um novo bombeiro a cada 2 minutos, até o limite de bombeiros. Cada bombeiro vem com seu caminhão, que não entra na floresta: lá ele desce e anda até o fogo. Perde energia fora da base.',
         {
           fontSize: '12px',
           color: '#f4f4f5',

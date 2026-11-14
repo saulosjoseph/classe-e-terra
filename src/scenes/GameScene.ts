@@ -14,6 +14,9 @@ import {
   COLLISION,
   DIFFICULTY_CONFIGS,
   FLORESTA_OUTER_RADIUS,
+  ALL_TRAIL_PATHS,
+  FOREST_TRAIL,
+  RURAL_ROAD,
   TREE_FIRE,
   FLORESTA_OUTER_RADIUS_Y,
   GAME_WIDTH,
@@ -28,6 +31,9 @@ import {
   WORLD_HEIGHT,
   WORLD_WIDTH,
   getIsoDistance,
+  isOnForestTrail,
+  isOnRuralRoad,
+  uvToWorld,
   getRandomPointInSector,
   getSectorAtPoint
 } from '../config/GameBalance';
@@ -125,15 +131,23 @@ interface ForestBush {
 const MATO_VARIANTS = 25;
 /** Quantidade de mato por setor (nasce fora de prédios e obstáculos) */
 const MATO_COUNT_BY_SECTOR: Record<SectorType, number> = {
-  [SectorType.CIDADE]: 60,
-  [SectorType.CAMPO]: 180,
-  [SectorType.FLORESTA]: 390
+  [SectorType.CIDADE]: 120,
+  [SectorType.CAMPO]: 360,
+  [SectorType.FLORESTA]: 780
 };
 /** Escala e âncora (base da planta) dos sprites de mato, menores que as árvores */
 const MATO_SPRITE_SCALE = 0.4;
 const MATO_SPRITE_ORIGIN_Y = 0.9;
 /** Variação de mato que aparece em dobro (100% a mais de quantidade) */
 const MATO_DOUBLED_VARIANT = 23;
+
+/** Pedras (pedra_1 a pedra_PEDRA_VARIANTS): decorativas, sem colisão, espalhadas na floresta e no campo */
+const PEDRA_VARIANTS = 9;
+const PEDRA_SPRITE_SCALE = 0.6;
+const PEDRA_COUNT_BY_SECTOR: Array<[SectorType, number]> = [
+  [SectorType.FLORESTA, 150],
+  [SectorType.CAMPO, 90]
+];
 
 /** Ponto onde os brigadistas nascem junto à Base dos Brigadistas (deslocamento em relação ao centro da base) */
 const BRIGADISTA_BASE_SPAWN_OFFSET = { x: -150, y: 120 };
@@ -1055,6 +1069,48 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
+    // Estrada de terra circundando a zona rural, com 4 ligações às ruas da cidade (uma em cada lado)
+    const ruralRoadGraphics = this.add.graphics().setDepth(2);
+    const roadHalf = RURAL_ROAD.WIDTH / 2;
+    const roadR = RURAL_ROAD.RADIUS;
+    const roadLink = RURAL_ROAD.LINK_START;
+    // Preenche um retângulo definido em coordenadas viárias (u, v), que vira um losango isométrico
+    const fillRoadRect = (uMin: number, uMax: number, vMin: number, vMax: number) => {
+      const toScreen = (u: number, v: number) => [cx + u - v, cy + (u + v) * 0.5];
+      const corners = [toScreen(uMin, vMin), toScreen(uMax, vMin), toScreen(uMax, vMax), toScreen(uMin, vMax)];
+      ruralRoadGraphics.fillStyle(0x9a6b44, 1);
+      ruralRoadGraphics.beginPath();
+      ruralRoadGraphics.moveTo(corners[0][0], corners[0][1]);
+      for (let c = 1; c < corners.length; c++) {
+        ruralRoadGraphics.lineTo(corners[c][0], corners[c][1]);
+      }
+      ruralRoadGraphics.closePath();
+      ruralRoadGraphics.fillPath();
+    };
+    // Quatro faixas formam o anel quadrado isométrico em volta do Campo
+    fillRoadRect(-roadR - roadHalf, roadR + roadHalf, roadR - roadHalf, roadR + roadHalf);
+    fillRoadRect(-roadR - roadHalf, roadR + roadHalf, -roadR - roadHalf, -roadR + roadHalf);
+    fillRoadRect(-roadR - roadHalf, -roadR + roadHalf, -roadR + roadHalf, roadR - roadHalf);
+    fillRoadRect(roadR - roadHalf, roadR + roadHalf, -roadR + roadHalf, roadR - roadHalf);
+    // Ligações retas entre o anel e as pontas das ruas da cidade
+    fillRoadRect(-roadHalf, roadHalf, roadLink, roadR + roadHalf);
+    fillRoadRect(-roadHalf, roadHalf, -roadR - roadHalf, -roadLink);
+    fillRoadRect(roadLink, roadR + roadHalf, -roadHalf, roadHalf);
+    fillRoadRect(-roadR - roadHalf, -roadLink, -roadHalf, roadHalf);
+
+    // Trilhas de terra estreitas pela floresta (sem árvores em cima, para dar passagem)
+    const trailGraphics = this.add.graphics().setDepth(2);
+    trailGraphics.lineStyle(FOREST_TRAIL.WIDTH, 0x7c5a34, 0.9);
+    for (const path of ALL_TRAIL_PATHS) {
+      trailGraphics.beginPath();
+      path.forEach(([u, v], idx) => {
+        const p = uvToWorld(u, v);
+        if (idx === 0) trailGraphics.moveTo(p.x, p.y);
+        else trailGraphics.lineTo(p.x, p.y);
+      });
+      trailGraphics.strokePath();
+    }
+
     // 3. Casas populares de Santarém alinhadas nos quarteirões gramados (conforme imagem de referência)
     // Cada quarteirão possui fileiras organizadas de casas voltadas para a rua
     for (let i = -4; i < 4; i++) {
@@ -1188,9 +1244,9 @@ export class GameScene extends Phaser.Scene {
     const casasRurais: { x: number; y: number }[] = [];
     const CASA_RURAL_MIN_DIST = 420;
     for (let i = 0; i < 10; i++) {
-      let pt = getRandomPointInSector(SectorType.CAMPO, 36);
+      let pt = this.getRuralPointOffRoad(36);
       for (let attempt = 0; attempt < 300; attempt++) {
-        const candidate = getRandomPointInSector(SectorType.CAMPO, 36);
+        const candidate = this.getRuralPointOffRoad(36);
         pt = candidate;
         const distante = casasRurais.every(
           (c) => Math.hypot(c.x - candidate.x, c.y - candidate.y) >= CASA_RURAL_MIN_DIST
@@ -1208,7 +1264,7 @@ export class GameScene extends Phaser.Scene {
 
     // Árvores da zona rural (CAMPO): entram em forestTrees, podendo pegar fogo como as da floresta
     for (let i = 0; i < 60; i++) {
-      const pt = getRandomPointInSector(SectorType.CAMPO, 36);
+      const pt = this.getRuralPointOffRoad(36);
       this.createForestTree(pt.x, pt.y);
     }
 
@@ -1265,11 +1321,28 @@ export class GameScene extends Phaser.Scene {
       let pt = getRandomPointInSector(SectorType.FLORESTA, 40);
       while (
         getIsoDistance(pt.x, pt.y, baseX, baseY) < baseClearing ||
-        ALDEIA_POSITIONS.some((pos) => getIsoDistance(pt.x, pt.y, pos.x, pos.y) < ALDEIA.CLEARING)
+        ALDEIA_POSITIONS.some((pos) => getIsoDistance(pt.x, pt.y, pos.x, pos.y) < ALDEIA.CLEARING) ||
+        isOnForestTrail(pt.x, pt.y, COLLISION.TREE_RADIUS + FOREST_TRAIL.WIDTH / 2)
       ) {
         pt = getRandomPointInSector(SectorType.FLORESTA, 40);
       }
       this.createForestTree(pt.x, pt.y);
+    }
+
+    // Pedras na floresta e na zona rural, fora de prédios, da estrada e das trilhas
+    for (const [sector, count] of PEDRA_COUNT_BY_SECTOR) {
+      for (let i = 0; i < count; i++) {
+        const variant = Phaser.Math.Between(1, PEDRA_VARIANTS);
+        let pt = this.findFreeMatoPoint(sector);
+        while (isOnForestTrail(pt.x, pt.y, FOREST_TRAIL.WIDTH)) {
+          pt = this.findFreeMatoPoint(sector);
+        }
+        this.add
+          .image(pt.x, pt.y, `pedra_${variant}`)
+          .setOrigin(0.5, 0.9)
+          .setScale(PEDRA_SPRITE_SCALE)
+          .setDepth(15 + Math.floor(pt.y));
+      }
     }
 
     // Mato espalhado por todo o mapa, depois das árvores e dos prédios para não nascer sobre eles
@@ -1286,10 +1359,19 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  /** Sorteia um ponto no Campo (zona rural) que não esteja sobre a estrada */
+  private getRuralPointOffRoad(margin: number): { x: number; y: number } {
+    let pt = getRandomPointInSector(SectorType.CAMPO, margin);
+    while (isOnRuralRoad(pt.x, pt.y)) {
+      pt = getRandomPointInSector(SectorType.CAMPO, margin);
+    }
+    return pt;
+  }
+
   /** Sorteia um ponto no setor que não esteja bloqueado por prédios ou obstáculos */
   private findFreeMatoPoint(sector: SectorType): { x: number; y: number } {
     let pt = getRandomPointInSector(sector, 24);
-    while (getCollisionSystem(this).isBlocked(pt.x, pt.y)) {
+    while (getCollisionSystem(this).isBlocked(pt.x, pt.y) || isOnRuralRoad(pt.x, pt.y)) {
       pt = getRandomPointInSector(sector, 24);
     }
     return pt;

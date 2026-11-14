@@ -77,6 +77,17 @@ export const CITY_RADIUS_Y = CITY_RADIUS * ISO_Y_RATIO; // 920
 export const CAMPO_RADIUS_Y = CAMPO_RADIUS * ISO_Y_RATIO; // 1400
 export const FLORESTA_OUTER_RADIUS_Y = FLORESTA_OUTER_RADIUS * ISO_Y_RATIO; // 1900
 
+/**
+ * Estrada de terra que circunda a zona rural (CAMPO), no meio do anel entre a Cidade e a Floresta.
+ * Coordenadas viárias (u, v) têm |u| e |v| <= distância isométrica / 2. LINK_START é onde cada ligação
+ * encontra a ponta das ruas da cidade (grade de 4 quarteirões de 240 px).
+ */
+export const RURAL_ROAD = {
+  RADIUS: (CITY_RADIUS + CAMPO_RADIUS) / 4,
+  WIDTH: 64,
+  LINK_START: 960
+} as const;
+
 /** Sede dos Brigadistas Voluntários, no anel da Floresta (noroeste) */
 export const BASE_BRIGADISTA_X = WORLD_CENTER_X - 2200;
 export const BASE_BRIGADISTA_Y = WORLD_CENTER_Y - 600;
@@ -154,6 +165,121 @@ export function getSectorAtPoint(x: number, y: number): SectorType {
     return SectorType.CAMPO;
   }
   return SectorType.FLORESTA;
+}
+
+/**
+ * Indica se (x, y) está sobre a estrada que circunda a zona rural ou sobre uma de suas ligações com a cidade.
+ */
+export function isOnRuralRoad(x: number, y: number): boolean {
+  const dx = x - WORLD_CENTER_X;
+  const s = (y - WORLD_CENTER_Y) * 2; // u + v
+  const u = (dx + s) / 2;
+  const v = (s - dx) / 2;
+  const outer = Math.max(Math.abs(u), Math.abs(v));
+  const inner = Math.min(Math.abs(u), Math.abs(v));
+  const halfWidth = RURAL_ROAD.WIDTH / 2;
+  const onRing = outer >= RURAL_ROAD.RADIUS - halfWidth && outer <= RURAL_ROAD.RADIUS + halfWidth;
+  const onLink =
+    inner <= halfWidth && outer >= RURAL_ROAD.LINK_START && outer <= RURAL_ROAD.RADIUS + halfWidth;
+  return onRing || onLink;
+}
+
+/**
+ * Converte coordenadas viárias (u, v) em coordenadas do mundo (plano do solo isométrico).
+ */
+export function uvToWorld(u: number, v: number): { x: number; y: number } {
+  return { x: WORLD_CENTER_X + u - v, y: WORLD_CENTER_Y + (u + v) * 0.5 };
+}
+
+/**
+ * Trilha em anel que liga as 4 aldeias (topo → direita → base → esquerda → topo).
+ * Cada trecho ganha uma curva: o ponto médio é puxado para o centro, sem entrar na zona rural.
+ */
+const VILLAGE_TRAIL_BEND = 0.9;
+
+function buildVillageTrailPath(): ReadonlyArray<readonly [number, number]> {
+  const toUv = (p: { x: number; y: number }): [number, number] => {
+    const dx = p.x - WORLD_CENTER_X;
+    const dy = p.y - WORLD_CENTER_Y;
+    return [dy + dx / 2, dy - dx / 2];
+  };
+  const vertices = ALDEIA_POSITIONS.map(toUv);
+  const path: Array<readonly [number, number]> = [vertices[0]];
+  for (let i = 0; i < vertices.length; i++) {
+    const [au, av] = vertices[i];
+    const next = vertices[(i + 1) % vertices.length];
+    path.push([((au + next[0]) / 2) * VILLAGE_TRAIL_BEND, ((av + next[1]) / 2) * VILLAGE_TRAIL_BEND]);
+    path.push(next);
+  }
+  return path;
+}
+
+/**
+ * Trilhas de terra estreitas dentro da floresta: polilinhas em coordenadas viárias (u, v), em volta do anel da Floresta.
+ */
+export const FOREST_TRAIL = {
+  WIDTH: 20,
+  PATHS: [
+    [
+      [1620, 120],
+      [1980, 260],
+      [2420, 140],
+      [2600, 380]
+    ],
+    [
+      [-1640, -200],
+      [-2000, -340],
+      [-2480, -160]
+    ],
+    [
+      [-300, 1620],
+      [-180, 2000],
+      [-420, 2450]
+    ],
+    [
+      [260, -1640],
+      [380, -2020],
+      [210, -2560]
+    ],
+    [
+      [1700, -900],
+      [2100, -1000],
+      [2400, -1400]
+    ],
+    [
+      [-1620, 900],
+      [-1900, 1100],
+      [-2300, 1500]
+    ]
+  ] as ReadonlyArray<ReadonlyArray<readonly [number, number]>>
+} as const;
+
+function distanceToSegment(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
+  const dx = bx - ax;
+  const dy = by - ay;
+  const lenSq = dx * dx + dy * dy;
+  const t = lenSq === 0 ? 0 : Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lenSq));
+  return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+}
+
+/**
+ * Indica se (x, y) está a menos de `clearance` px de uma trilha da floresta.
+ */
+/** Todas as trilhas da floresta, incluindo a que liga as aldeias */
+export const ALL_TRAIL_PATHS: ReadonlyArray<ReadonlyArray<readonly [number, number]>> = [
+  ...FOREST_TRAIL.PATHS,
+  buildVillageTrailPath()
+];
+
+export function isOnForestTrail(x: number, y: number, clearance = FOREST_TRAIL.WIDTH / 2): boolean {
+  return ALL_TRAIL_PATHS.some((path) => {
+    for (let i = 0; i < path.length - 1; i++) {
+      const a = uvToWorld(path[i][0], path[i][1]);
+      const b = uvToWorld(path[i + 1][0], path[i + 1][1]);
+      if (distanceToSegment(x, y, a.x, a.y, b.x, b.y) <= clearance) return true;
+    }
+    return false;
+  });
 }
 
 /**
@@ -317,6 +443,8 @@ export const BALANCE = {
   BOMBEIROS_BASE_MAX_AJUSTE_FISCAL: 1,
   BOMBEIRO: {
     SPEED: 170,
+    /** Velocidade do bombeiro andando a pé dentro da floresta (o caminhão não entra nela) */
+    WALK_SPEED: 65,
     EXTINGUISH_POWER: 26,
     /** Energia consumida por segundo enquanto o bombeiro está fora da base */
     STAMINA_DRAIN_PER_SEC: 2
