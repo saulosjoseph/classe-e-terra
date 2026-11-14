@@ -50,6 +50,7 @@ import { Incendiario } from '../entities/Incendiario';
 import { TrabalhadorRural, TrabalhadorRuralVariant } from '../entities/TrabalhadorRural';
 import { Unit } from '../entities/Unit';
 import { CollisionSystem, getCollisionSystem, registerCollisionSystem } from '../systems/CollisionSystem';
+import { GameClock, registerGameClock } from '../systems/GameClock';
 import { ActiveFireInstance, FireSmokeSystem, ScorchMark } from '../systems/FireSmokeSystem';
 import { PoliticalPhaseSystem } from '../systems/PoliticalPhaseSystem';
 import { SectorSystem } from '../systems/SectorSystem';
@@ -286,7 +287,9 @@ export class GameScene extends Phaser.Scene {
   private prefeituraPos: { x: number; y: number } | null = null;
   private prefeituraSprite: Phaser.GameObjects.Sprite | null = null;
   private prefeituraFocusContainer: Phaser.GameObjects.Container | null = null;
-  private gameTimeMs = 0;
+  private readonly clock = new GameClock();
+  /** Multiplicador da simulação escolhido no menu de opções (1, 1.5, 2, 3 ou 4) */
+  private gameSpeed = 1;
   private houseFocusContainer: Phaser.GameObjects.Container | null = null;
   private brigadistaBaseSprite: Phaser.GameObjects.Sprite | null = null;
   private brigadistaBaseFocusContainer: Phaser.GameObjects.Container | null = null;
@@ -320,7 +323,8 @@ export class GameScene extends Phaser.Scene {
     this.introTrabalhador = null;
     this.trabalhadorSpeechBubble = null;
     this.cityHouses = [];
-    this.gameTimeMs = 0;
+    this.clock.reset();
+    this.gameSpeed = 1;
     this.houseFocusContainer = null;
     this.prefeituraFocusContainer = null;
     this.brigadistaBaseSprite = null;
@@ -333,7 +337,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   public create(): void {
-    this.matchStartTime = this.time.now;
+    registerGameClock(this, this.clock);
+    this.matchStartTime = this.clock.now();
     SoundManager.startMusic();
 
     this.setupScrollableCamera();
@@ -879,7 +884,7 @@ export class GameScene extends Phaser.Scene {
 
   public getHouseCooldownRemainingMs(houseId: number): number {
     const house = this.findCityHouse(houseId);
-    return house ? Math.max(0, house.readyAt - this.gameTimeMs) : 0;
+    return house ? Math.max(0, house.readyAt - this.clock.now()) : 0;
   }
 
   /** Doações são bloqueadas quando todos os brigadistas já estão com energia cheia. */
@@ -895,7 +900,7 @@ export class GameScene extends Phaser.Scene {
 
     const { COOLDOWN_MS, CONSCIOUSNESS_GAIN, BRIGADISTA_ENERGY_PERCENT } =
       BALANCE.HOUSE_DONATION;
-    house.readyAt = this.gameTimeMs + COOLDOWN_MS;
+    house.readyAt = this.clock.now() + COOLDOWN_MS;
 
     this.phaseSystem.addConsciousness(CONSCIOUSNESS_GAIN, 'Doação de moradores');
     for (const brig of this.brigadistas) {
@@ -1562,7 +1567,7 @@ export class GameScene extends Phaser.Scene {
       if (bush.burnLeftMs <= 0) {
         bush.state = 'burned';
         bush.sprite.destroy();
-        this.fireSystem.createScorchMark(bush.x, bush.y);
+        this.fireSystem.stampScorchMark(bush.x, bush.y);
       }
     }
 
@@ -1837,7 +1842,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   public getBombeiroBaseCooldownRemainingMs(): number {
-    return Math.max(0, this.bombeiroBaseReadyAt - this.time.now);
+    return Math.max(0, this.bombeiroBaseReadyAt - this.clock.now());
   }
 
   public tryRecruitBombeiro(): boolean {
@@ -1849,7 +1854,7 @@ export class GameScene extends Phaser.Scene {
     const unit = this.spawnBombeiroUnit(spawnX, spawnY, true);
     if (!unit) return false;
 
-    this.bombeiroBaseReadyAt = this.time.now + BALANCE.COOLDOWNS.SPAWN_BOMBEIRO_BASE;
+    this.bombeiroBaseReadyAt = this.clock.now() + BALANCE.COOLDOWNS.SPAWN_BOMBEIRO_BASE;
     SoundManager.playSelect();
     return true;
   }
@@ -1874,7 +1879,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   public getBrigadistaBaseCooldownRemainingMs(): number {
-    return Math.max(0, this.brigadistaBaseReadyAt - this.time.now);
+    return Math.max(0, this.brigadistaBaseReadyAt - this.clock.now());
   }
 
   public tryRecruitBrigadista(): boolean {
@@ -1887,7 +1892,7 @@ export class GameScene extends Phaser.Scene {
     const unit = this.spawnBrigadistaUnit(spawnX, spawnY, isComunitario, true);
     if (!unit) return false;
 
-    this.brigadistaBaseReadyAt = this.time.now + BALANCE.COOLDOWNS.SPAWN_BRIGADISTA_BASE;
+    this.brigadistaBaseReadyAt = this.clock.now() + BALANCE.COOLDOWNS.SPAWN_BRIGADISTA_BASE;
     SoundManager.playSelect();
     return true;
   }
@@ -1895,9 +1900,9 @@ export class GameScene extends Phaser.Scene {
   public tryRecruitGuarda(): boolean {
     if (!this.phaseSystem.isGuardaFlorestalUnlocked()) return false;
     if (this.guardas.length >= BALANCE.MAX_GUARDAS) return false;
-    if (this.time.now < this.spawnGuardaReadyAt) return false;
+    if (this.clock.now() < this.spawnGuardaReadyAt) return false;
 
-    this.spawnGuardaReadyAt = this.time.now + BALANCE.COOLDOWNS.SPAWN_GUARDA;
+    this.spawnGuardaReadyAt = this.clock.now() + BALANCE.COOLDOWNS.SPAWN_GUARDA;
     const pt = getRandomPointInSector(SectorType.FLORESTA, 60);
     this.spawnGuardaUnit(pt.x, pt.y, true);
     SoundManager.playSelect();
@@ -1905,8 +1910,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   public getGuardaRecruitCooldownRatio(): number {
-    if (this.time.now >= this.spawnGuardaReadyAt) return 0;
-    return (this.spawnGuardaReadyAt - this.time.now) / BALANCE.COOLDOWNS.SPAWN_GUARDA;
+    if (this.clock.now() >= this.spawnGuardaReadyAt) return 0;
+    return (this.spawnGuardaReadyAt - this.clock.now()) / BALANCE.COOLDOWNS.SPAWN_GUARDA;
   }
 
   public getBrigadistaCount(): number {
@@ -2024,17 +2029,24 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  public override update(_time: number, deltaMs: number): void {
+  /** Define a velocidade da simulação (1x a 4x); cooldowns e durações acompanham o relógio de jogo */
+  public setGameSpeed(speed: number): void {
+    this.gameSpeed = speed;
+  }
+
+  public override update(_time: number, realDeltaMs: number): void {
     this.staticMapTiles?.updateVisibility(this.cameras.main);
     if (this.isEnding || this.isStoryModalOpen) return;
 
-    this.gameTimeMs += deltaMs;
+    // A simulação roda na velocidade escolhida; a câmera (teclado) continua em tempo real
+    const deltaMs = realDeltaMs * this.gameSpeed;
+    this.clock.advance(deltaMs);
     this.houseFocusContainer?.setScale(1 / this.cameraZoom);
     this.prefeituraFocusContainer?.setScale(1 / this.cameraZoom);
     this.brigadistaBaseFocusContainer?.setScale(1 / this.cameraZoom);
 
     // Suporte adicional a setas / WASD para mover a câmera caso jogue no computador
-    const camSpeed = 0.42 * deltaMs;
+    const camSpeed = 0.42 * realDeltaMs;
     const cam = this.cameras.main;
     let manualKeyMove = false;
     if (this.cursors?.left.isDown || this.wasdKeys?.A.isDown) {
@@ -2151,7 +2163,7 @@ export class GameScene extends Phaser.Scene {
     if (this.isEnding) return;
     this.isEnding = true;
 
-    const elapsedSeconds = Math.max(1, Math.round((this.time.now - this.matchStartTime) / 1000));
+    const elapsedSeconds = Math.max(1, Math.round((this.clock.now() - this.matchStartTime) / 1000));
     const result: GameStatsResult = {
       victory,
       reason,

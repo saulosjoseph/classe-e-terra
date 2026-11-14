@@ -16,6 +16,7 @@ import {
 } from '../types/GameTypes';
 import { FireSmokeSystem } from './FireSmokeSystem';
 import { PoliticalPhaseSystem } from './PoliticalPhaseSystem';
+import { getGameClock } from './GameClock';
 
 export class SectorSystem extends Phaser.Events.EventEmitter {
   private scene: Phaser.Scene;
@@ -69,7 +70,7 @@ export class SectorSystem extends Phaser.Events.EventEmitter {
   }
 
   public getCooldownRemainingRatio(actionKey: string): number {
-    const now = this.scene.time.now;
+    const now = getGameClock(this.scene).now();
     const end = this.cooldownEnds.get(actionKey) ?? 0;
     const dur = this.cooldownDurations.get(actionKey) ?? 1;
     if (now >= end) return 0;
@@ -106,7 +107,7 @@ export class SectorSystem extends Phaser.Events.EventEmitter {
   private triggerCooldown(actionKey: string, baseMs: number, originSector: SectorType): void {
     const duration = this.computeEffectiveCooldown(baseMs, originSector);
     this.cooldownDurations.set(actionKey, duration);
-    this.cooldownEnds.set(actionKey, this.scene.time.now + duration);
+    this.cooldownEnds.set(actionKey, getGameClock(this.scene).now() + duration);
   }
 
   /**

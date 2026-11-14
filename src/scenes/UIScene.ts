@@ -28,6 +28,9 @@ import {
 } from '../types/GameTypes';
 import { GameScene } from './GameScene';
 
+/** Intervalo mínimo entre redesenhos do minimapa (o mapa não precisa de 60 atualizações por segundo) */
+const MINIMAP_REFRESH_MS = 100;
+
 interface TouchActionButton {
   key: string;
   rect: Phaser.GameObjects.Rectangle;
@@ -71,6 +74,7 @@ export class UIScene extends Phaser.Scene {
   private readonly minimapX = GAME_WIDTH - 48;
   private readonly minimapY = MAP_TOP_Y + 46;
   private readonly minimapRadius = 36;
+  private lastMinimapAt = -Infinity;
 
   constructor() {
     super('UIScene');
@@ -1566,7 +1570,11 @@ export class UIScene extends Phaser.Scene {
       }
     }
 
-    this.updateMinimapAndSectorIndicator();
+    const minimapNow = this.time.now;
+    if (minimapNow - this.lastMinimapAt >= MINIMAP_REFRESH_MS) {
+      this.lastMinimapAt = minimapNow;
+      this.updateMinimapAndSectorIndicator();
+    }
   }
 
   private updateMinimapAndSectorIndicator(): void {

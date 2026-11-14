@@ -13,6 +13,7 @@ import {
 } from '../config/GameBalance';
 import { UnitType } from '../types/GameTypes';
 import { createNavRoute, getCollisionSystem, NavRoute } from '../systems/CollisionSystem';
+import { getGameClock } from '../systems/GameClock';
 
 export abstract class Unit extends Phaser.Events.EventEmitter {
   public readonly id: string;
@@ -149,12 +150,12 @@ export abstract class Unit extends Phaser.Events.EventEmitter {
   }
 
   public applyEquipmentBoost(durationMs = 15000): void {
-    this.equipmentBoostUntil = this.scene.time.now + durationMs;
+    this.equipmentBoostUntil = getGameClock(this.scene).now() + durationMs;
     this.stamina = this.maxStamina;
   }
 
   public hasEquipmentBoost(): boolean {
-    return this.scene.time.now < this.equipmentBoostUntil;
+    return getGameClock(this.scene).now() < this.equipmentBoostUntil;
   }
 
   public isMoving(): boolean {

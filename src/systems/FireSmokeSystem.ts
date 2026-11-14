@@ -16,13 +16,30 @@ import {
 } from '../config/GameBalance';
 import { FireNodeData, SectorType } from '../types/GameTypes';
 import { SoundManager } from '../audio/SoundManager';
+import { getGameClock } from './GameClock';
 
 /** Profundidade única das barras de intensidade: uma só camada para todos os focos */
 const FIRE_BARS_DEPTH = 9000;
 /** Lado de cada bloco de marcas de queimada, em px do mundo */
-const SCORCH_TILE_SIZE = 1024;
+const SCORCH_TILE_SIZE = 512;
+/** Resolução das texturas de marcas permanentes em relação ao mundo (0,5 = um quarto da memória) */
+const STAMP_RESOLUTION = 0.5;
 /** Margem extra na decisão de visibilidade, cobrindo o atraso de um quadro da câmera */
 const SCORCH_CULL_MARGIN = 256;
+/** Lado das células que registram terreno já queimado: um foco só se expande para células ainda não queimadas */
+const BURN_CELL_SIZE = 40;
+/** Distância dos pontos checados em volta de um foco para saber se ainda há terreno para expandir */
+const EXPANSION_PROBE_DIST = 60;
+const PROBE_DIRECTIONS: ReadonlyArray<readonly [number, number]> = [
+  [1, 0], [-1, 0], [0, 1], [0, -1],
+  [0.7071, 0.7071], [0.7071, -0.7071], [-0.7071, 0.7071], [-0.7071, -0.7071]
+];
+/** Tentativas de expansão bloqueadas seguidas até o foco ser considerado esgotado */
+const STALL_LIMIT = 3;
+/** Perda de intensidade por segundo de um foco esgotado, que se apaga sozinho */
+const EXHAUSTED_DECAY_PER_SEC = 12;
+/** Intervalo mínimo entre redesenhos das barras de intensidade */
+const BARS_REFRESH_MS = 100;
 
 /** Escalas aplicadas às texturas de marca de queimada (assadas no Blitter, pois bobs não têm escala) */
 const SCORCH_GROUND_SCALE = 0.45;
@@ -33,10 +50,20 @@ export interface ScorchMark {
   destroy(): void;
 }
 
-/** Blitters de marcas de queimada de um bloco do mapa; cada bloco é escondido quando está fora da câmera */
+/** Blitters de marcas removíveis (de árvores) de um bloco; cada bloco é escondido quando está fora da câmera */
 interface ScorchTile {
   ground: Phaser.GameObjects.Blitter;
   smoke: Phaser.GameObjects.Blitter;
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+}
+
+/** Texturas de marcas permanentes de um bloco, carimbadas uma vez e nunca removidas */
+interface StampTile {
+  ground: Phaser.GameObjects.RenderTexture;
+  smoke: Phaser.GameObjects.RenderTexture;
   minX: number;
   minY: number;
   maxX: number;
@@ -52,6 +79,10 @@ export interface ActiveFireInstance {
   hitZone: Phaser.GameObjects.Zone;
   /** Último estado visível das barras (nível de fumaça + intensidade inteira) */
   ringStateKey: number;
+  /** Tentativas de expansão seguidas bloqueadas por terreno já queimado */
+  stalledTicks: number;
+  /** Sem terreno para crescer: não cresce mais e se apaga aos poucos */
+  exhausted: boolean;
 }
 
 /**
@@ -76,12 +107,63 @@ export class FireSmokeSystem extends Phaser.Events.EventEmitter {
   private scorchGroundSize = { w: 0, h: 0 };
   private scorchSmokeSize = { w: 0, h: 0 };
   private scorchTiles: Map<string, ScorchTile> = new Map();
+  private stampTiles: Map<string, StampTile> = new Map();
   private barsGraphics: Phaser.GameObjects.Graphics | null = null;
   private barsDirty = false;
+  private lastBarsDrawAt = -Infinity;
+  private readonly burnedCols = Math.ceil(WORLD_WIDTH / BURN_CELL_SIZE);
+  private readonly burnedRows = Math.ceil(WORLD_HEIGHT / BURN_CELL_SIZE);
+  /** 1 nas células onde já houve fogo ou marca de queimada (combustível consumido) */
+  private burnedCells: Uint8Array = new Uint8Array(this.burnedCols * this.burnedRows);
 
   constructor(scene: Phaser.Scene) {
     super();
     this.scene = scene;
+  }
+
+  /** Registra terreno queimado. Fora do mapa conta como queimado, para não expandir para fora */
+  private markBurned(x: number, y: number): void {
+    const i = Math.floor(x / BURN_CELL_SIZE);
+    const j = Math.floor(y / BURN_CELL_SIZE);
+    if (i < 0 || j < 0 || i >= this.burnedCols || j >= this.burnedRows) return;
+    this.burnedCells[j * this.burnedCols + i] = 1;
+  }
+
+  private isBurned(x: number, y: number): boolean {
+    const i = Math.floor(x / BURN_CELL_SIZE);
+    const j = Math.floor(y / BURN_CELL_SIZE);
+    if (i < 0 || j < 0 || i >= this.burnedCols || j >= this.burnedRows) return true;
+    return this.burnedCells[j * this.burnedCols + i] === 1;
+  }
+
+  /** Um foco está cercado quando todos os pontos ao redor já estão queimados: não há mais para onde crescer */
+  private isSurrounded(inst: ActiveFireInstance): boolean {
+    for (const [dx, dy] of PROBE_DIRECTIONS) {
+      const px = inst.data.x + dx * EXPANSION_PROBE_DIST;
+      const py = inst.data.y + dy * EXPANSION_PROBE_DIST * ISO_Y_RATIO;
+      if (!this.isBurned(px, py)) return false;
+    }
+    return true;
+  }
+
+  /** O foco queima a área que ocupa (3x3 células em volta dele): é isso que deixa de ser combustível */
+  private burnFireArea(inst: ActiveFireInstance): void {
+    const ci = Math.floor(inst.data.x / BURN_CELL_SIZE);
+    const cj = Math.floor(inst.data.y / BURN_CELL_SIZE);
+    for (let dj = -1; dj <= 1; dj++) {
+      for (let di = -1; di <= 1; di++) {
+        this.markBurned((ci + di + 0.5) * BURN_CELL_SIZE, (cj + dj + 0.5) * BURN_CELL_SIZE);
+      }
+    }
+  }
+
+  private removeFire(inst: ActiveFireInstance): void {
+    inst.fireSprite.destroy();
+    inst.smokeSprite.destroy();
+    inst.haloSprite.destroy();
+    inst.hitZone.destroy();
+    this.fires.delete(inst.data.id);
+    this.barsDirty = true;
   }
 
   public getActiveFires(): ActiveFireInstance[] {
@@ -153,7 +235,7 @@ export class FireSmokeSystem extends Phaser.Events.EventEmitter {
       .setDepth(35);
 
     // Persistente: permanece no solo mesmo após o fogo ser apagado
-    this.createScorchMark(clampedX, clampedY);
+    this.stampScorchMark(clampedX, clampedY);
 
     const data: FireNodeData = {
       id,
@@ -171,8 +253,9 @@ export class FireSmokeSystem extends Phaser.Events.EventEmitter {
       smokeSprite,
       haloSprite,
       hitZone,
-      ringStateKey: -1
-    };
+      ringStateKey: -1,
+      stalledTicks: 0,
+      exhausted: false    };
 
     hitZone.on('pointerup', (pointer: Phaser.Input.Pointer) => {
       if (pointer.getDistance() < 12) {
@@ -189,6 +272,7 @@ export class FireSmokeSystem extends Phaser.Events.EventEmitter {
 
   /** Solo preto e fumaça preta que marcam um ponto queimado; quem chama decide quando destruí-los */
   public createScorchMark(x: number, y: number): ScorchMark[] {
+    this.markBurned(x, y);
     this.ensureScorchTextures();
     const tile = this.getScorchTile(x, y);
 
@@ -243,15 +327,89 @@ export class FireSmokeSystem extends Phaser.Events.EventEmitter {
     return tile;
   }
 
+  /**
+   * Carimba uma marca permanente (solo e fumaça) na textura do bloco e não cria objeto por marca.
+   * Usada para focos e matos queimados, que nunca são removidos.
+   */
+  public stampScorchMark(x: number, y: number): void {
+    this.markBurned(x, y);
+    this.ensureScorchTextures();
+    const tile = this.getStampTile(x, y);
+    const s = STAMP_RESOLUTION;
+
+    const groundX = (x - this.scorchGroundSize.w / 2 - tile.minX) * s;
+    const groundY = (y - this.scorchGroundSize.h / 2 - tile.minY) * s;
+    tile.ground
+      .stamp(this.scorchGroundKey!, undefined, groundX, groundY, { originX: 0, originY: 0, scale: s })
+      .render();
+
+    const smokeX = (x - this.scorchSmokeSize.w / 2 - tile.minX) * s;
+    const smokeY = (y - 30 - this.scorchSmokeSize.h * 0.8 - tile.minY) * s;
+    tile.smoke
+      .stamp(this.scorchSmokeKey!, undefined, smokeX, smokeY, { originX: 0, originY: 0, scale: s, alpha: 0.55 })
+      .render();
+  }
+
+  private getStampTile(x: number, y: number): StampTile {
+    const i = Math.floor(x / SCORCH_TILE_SIZE);
+    const j = Math.floor(y / SCORCH_TILE_SIZE);
+    const key = `${i},${j}`;
+    const existing = this.stampTiles.get(key);
+    if (existing) return existing;
+
+    // Margem para que marcas perto da borda do bloco não sejam cortadas
+    const pad = Math.ceil(
+      Math.max(
+        this.scorchGroundSize.w,
+        this.scorchGroundSize.h,
+        this.scorchSmokeSize.w,
+        this.scorchSmokeSize.h
+      )
+    );
+    const left = i * SCORCH_TILE_SIZE - pad;
+    const top = j * SCORCH_TILE_SIZE - pad;
+    const size = SCORCH_TILE_SIZE + pad * 2;
+    const pixels = size * STAMP_RESOLUTION;
+    // A textura tem metade da resolução; a escala de exibição devolve o tamanho do mundo
+    const displayScale = 1 / STAMP_RESOLUTION;
+    const tile: StampTile = {
+      ground: this.scene.add
+        .renderTexture(left, top, pixels, pixels)
+        .setOrigin(0, 0)
+        .setScale(displayScale)
+        .setDepth(3),
+      smoke: this.scene.add
+        .renderTexture(left, top, pixels, pixels)
+        .setOrigin(0, 0)
+        .setScale(displayScale)
+        .setDepth(3.1),
+      minX: left,
+      minY: top,
+      maxX: left + size,
+      maxY: top + size
+    };
+    this.stampTiles.set(key, tile);
+    return tile;
+  }
+
   private cullScorchTiles(): void {
     const view = this.scene.cameras.main.worldView;
     const left = view.x - SCORCH_CULL_MARGIN;
     const top = view.y - SCORCH_CULL_MARGIN;
     const right = view.x + view.width + SCORCH_CULL_MARGIN;
     const bottom = view.y + view.height + SCORCH_CULL_MARGIN;
+    const inView = (tile: { minX: number; minY: number; maxX: number; maxY: number }) =>
+      tile.maxX >= left && tile.minX <= right && tile.maxY >= top && tile.minY <= bottom;
 
     for (const tile of this.scorchTiles.values()) {
-      const visible = tile.maxX >= left && tile.minX <= right && tile.maxY >= top && tile.minY <= bottom;
+      const visible = inView(tile);
+      if (tile.ground.visible !== visible) {
+        tile.ground.setVisible(visible);
+        tile.smoke.setVisible(visible);
+      }
+    }
+    for (const tile of this.stampTiles.values()) {
+      const visible = inView(tile);
       if (tile.ground.visible !== visible) {
         tile.ground.setVisible(visible);
         tile.smoke.setVisible(visible);
@@ -340,16 +498,16 @@ export class FireSmokeSystem extends Phaser.Events.EventEmitter {
       ringRadius,
       thickness: 28,
       graphics: g,
-      expiresAt: this.scene.time.now + durationMs
+      expiresAt: getGameClock(this.scene).now() + durationMs
     });
   }
 
   public activateWaterShield(durationMs = 15000): void {
-    this.waterShieldUntil = this.scene.time.now + durationMs;
+    this.waterShieldUntil = getGameClock(this.scene).now() + durationMs;
   }
 
   public isWaterShieldActive(): boolean {
-    return this.scene.time.now < this.waterShieldUntil;
+    return getGameClock(this.scene).now() < this.waterShieldUntil;
   }
 
   public isProtectedByFirebreak(x: number, y: number): boolean {
@@ -395,7 +553,7 @@ export class FireSmokeSystem extends Phaser.Events.EventEmitter {
     indigenousDemarcationActive: boolean
   ): { forestDamage: number } {
     this.cullScorchTiles();
-    const now = this.scene.time.now;
+    const now = getGameClock(this.scene).now();
 
     this.firebreaks = this.firebreaks.filter((fb) => {
       if (now >= fb.expiresAt) {
@@ -407,8 +565,10 @@ export class FireSmokeSystem extends Phaser.Events.EventEmitter {
 
     const dtSec = deltaMs / 1000;
     let totalForestDamage = 0;
+    const burnedOut: ActiveFireInstance[] = [];
 
     for (const inst of this.fires.values()) {
+      this.burnFireArea(inst);
       let sectorMult = 1.0;
       if (inst.data.sector === SectorType.FLORESTA && indigenousDemarcationActive) {
         sectorMult = 0.5;
@@ -417,8 +577,16 @@ export class FireSmokeSystem extends Phaser.Events.EventEmitter {
         sectorMult *= 0.45;
       }
 
-      const geometricRate = (0.042 * inst.data.intensity + 1.4) * fireGrowthMultiplier * sectorMult;
-      inst.data.intensity = Math.min(100, inst.data.intensity + geometricRate * dtSec);
+      if (inst.exhausted) {
+        inst.data.intensity -= EXHAUSTED_DECAY_PER_SEC * dtSec;
+        if (inst.data.intensity <= 0) {
+          burnedOut.push(inst);
+          continue;
+        }
+      } else {
+        const geometricRate = (0.042 * inst.data.intensity + 1.4) * fireGrowthMultiplier * sectorMult;
+        inst.data.intensity = Math.min(100, inst.data.intensity + geometricRate * dtSec);
+      }
 
       if (inst.data.intensity < 32) {
         inst.data.smokeLevel = 1;
@@ -441,12 +609,17 @@ export class FireSmokeSystem extends Phaser.Events.EventEmitter {
       totalForestDamage += (inst.data.intensity / 100) * 0.85 * sectorWeight * sectorMult * dtSec;
     }
 
-    // Propagação geométrica no plano do solo isométrico (avança em direção à Cidade no centro)
+    // Propagação só para terreno ainda não queimado: o fogo avança pelas bordas da área queimada
     this.spreadTimer += deltaMs;
     if (this.spreadTimer >= 3800) {
       this.spreadTimer = 0;
       const currentFires = Array.from(this.fires.values());
       for (const inst of currentFires) {
+        if (inst.exhausted) continue;
+        if (this.isSurrounded(inst)) {
+          inst.exhausted = true;
+          continue;
+        }
         if (inst.data.intensity >= 74) {
           const chance =
             inst.data.sector === SectorType.FLORESTA && indigenousDemarcationActive ? 0.22 : 0.42;
@@ -457,17 +630,27 @@ export class FireSmokeSystem extends Phaser.Events.EventEmitter {
             );
             const spreadAngle = groundAngleToCity + Phaser.Math.FloatBetween(-0.95, 0.95);
             const dist = Phaser.Math.Between(55, 92);
-            this.spawnFire(
-              inst.data.x + Math.cos(spreadAngle) * dist,
-              inst.data.y + Math.sin(spreadAngle) * (dist * ISO_Y_RATIO),
-              22
-            );
+            const targetX = inst.data.x + Math.cos(spreadAngle) * dist;
+            const targetY = inst.data.y + Math.sin(spreadAngle) * (dist * ISO_Y_RATIO);
+            if (this.isBurned(targetX, targetY)) {
+              inst.stalledTicks++;
+              if (inst.stalledTicks >= STALL_LIMIT) inst.exhausted = true;
+            } else {
+              inst.stalledTicks = 0;
+              this.spawnFire(targetX, targetY, 22);
+            }
           }
         }
       }
     }
 
-    if (this.barsDirty) {
+    for (const inst of burnedOut) {
+      this.removeFire(inst);
+    }
+
+    const barsNow = this.scene.time.now;
+    if (this.barsDirty && barsNow - this.lastBarsDrawAt >= BARS_REFRESH_MS) {
+      this.lastBarsDrawAt = barsNow;
       this.drawBars();
     }
 
