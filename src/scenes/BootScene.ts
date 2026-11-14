@@ -10,6 +10,7 @@ export class BootScene extends Phaser.Scene {
     this.load.image('prefeitura', 'assets/prefeitura.png');
     this.load.image('base_brigadista_voluntario', 'assets/base_brigadista_voluntario.png');
     this.load.image('aldeia', 'assets/aldeia.png');
+    this.load.image('casa_rural', 'assets/casa_rural.png');
     this.load.image('base_bombeiros', 'assets/base_bombeiros.png');
     this.load.image('caminhao_bombeiros', 'assets/caminhao_bombeiros.png');
     this.load.spritesheet('bombeiro_spray', 'assets/bombeiro_spray.png', {

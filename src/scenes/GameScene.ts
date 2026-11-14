@@ -1093,15 +1093,27 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
-    // Props do CAMPO QUADRADO ISOMÉTRICO (Palafitas e roçados ribeirinhos)
-    for (let i = 0; i < 24; i++) {
-      const pt = getRandomPointInSector(SectorType.CAMPO, 36);
+    // Casas da zona rural (CAMPO QUADRADO ISOMÉTRICO), decorativas e obstáculos de colisão.
+    // Sorteio com distância mínima entre elas para espalhá-las pelo campo
+    const casasRurais: { x: number; y: number }[] = [];
+    const CASA_RURAL_MIN_DIST = 420;
+    for (let i = 0; i < 10; i++) {
+      let pt = getRandomPointInSector(SectorType.CAMPO, 36);
+      for (let attempt = 0; attempt < 300; attempt++) {
+        const candidate = getRandomPointInSector(SectorType.CAMPO, 36);
+        pt = candidate;
+        const distante = casasRurais.every(
+          (c) => Math.hypot(c.x - candidate.x, c.y - candidate.y) >= CASA_RURAL_MIN_DIST
+        );
+        if (distante) break;
+      }
+      casasRurais.push(pt);
       this.add
-        .sprite(pt.x, pt.y, 'prop_farm')
+        .sprite(pt.x, pt.y, 'casa_rural')
         .setOrigin(0.5, 0.9)
-        .setDepth(15 + Math.floor(pt.y))
-        .setAlpha(0.96);
-      getCollisionSystem(this).addObstacle(pt.x, pt.y, COLLISION.FARM_RADIUS);
+        .setScale(0.85)
+        .setDepth(15 + Math.floor(pt.y));
+      getCollisionSystem(this).addObstacle(pt.x, pt.y, COLLISION.HOUSE_RADIUS);
     }
 
     // Árvores da zona rural (CAMPO): entram em forestTrees, podendo pegar fogo como as da floresta
