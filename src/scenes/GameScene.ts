@@ -176,6 +176,8 @@ export class GameScene extends Phaser.Scene {
   private prefeituraFocusContainer: Phaser.GameObjects.Container | null = null;
   private gameTimeMs = 0;
   private houseFocusContainer: Phaser.GameObjects.Container | null = null;
+  private brigadistaBaseSprite: Phaser.GameObjects.Sprite | null = null;
+  private brigadistaBaseFocusContainer: Phaser.GameObjects.Container | null = null;
 
   constructor() {
     super('GameScene');
@@ -209,6 +211,8 @@ export class GameScene extends Phaser.Scene {
     this.gameTimeMs = 0;
     this.houseFocusContainer = null;
     this.prefeituraFocusContainer = null;
+    this.brigadistaBaseSprite = null;
+    this.brigadistaBaseFocusContainer = null;
     this.followedTarget = null;
     this.cameraZoom = 0.28125;
     this.isPinchingCamera = false;
@@ -505,16 +509,55 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * Foca o Brigadista Voluntário ao iniciar a partida. Ele começa com energia cheia e a fala
-   * de exaustão só aparece quando a energia chegar ao mínimo (ver showBrigadistaExhaustedBubble).
+   * Foca a Base dos Brigadistas ao iniciar a partida e a destaca até o jogador tocar nela.
+   * O Brigadista Voluntário nasce ao lado da base; a fala de exaustão só aparece quando a energia chegar ao mínimo.
    */
   public startBrigadistaIntro(): void {
-    if (this.introStarted) return;
-    const voluntario = this.brigadistas[0];
-    if (!voluntario) return;
+    if (this.introStarted || !this.brigadistaBaseSprite) return;
 
     this.introStarted = true;
-    this.followEntity(voluntario);
+    this.stopFollowingEntity();
+    this.centerCameraOnPoint(BASE_BRIGADISTA_X, BASE_BRIGADISTA_Y, true, false);
+    this.showBrigadistaBaseFocusIndicator();
+  }
+
+  private showBrigadistaBaseFocusIndicator(): void {
+    if (!this.brigadistaBaseSprite) return;
+    this.clearBrigadistaBaseFocus();
+
+    const sprite = this.brigadistaBaseSprite;
+    const ring = this.add.ellipse(0, 0, 220, 120).setStrokeStyle(4, 0xfacc15, 1);
+    const label = this.add
+      .text(0, -ring.height / 2 - 6, 'Base dos Brigadistas · Toque para conhecer', {
+        fontSize: '12px',
+        fontStyle: 'bold',
+        color: '#fef08a',
+        backgroundColor: '#052e16dd',
+        padding: { x: 6, y: 3 }
+      })
+      .setOrigin(0.5, 1);
+
+    this.tweens.add({
+      targets: ring,
+      scaleX: 1.12,
+      scaleY: 1.12,
+      alpha: 0.35,
+      yoyo: true,
+      repeat: -1,
+      duration: 650
+    });
+
+    this.brigadistaBaseFocusContainer = this.add
+      .container(BASE_BRIGADISTA_X, BASE_BRIGADISTA_Y - sprite.displayHeight * 0.25, [ring, label])
+      .setDepth(60000)
+      .setScale(1 / this.cameraZoom);
+  }
+
+  private clearBrigadistaBaseFocus(): void {
+    if (!this.brigadistaBaseFocusContainer) return;
+    this.tweens.killTweensOf(this.brigadistaBaseFocusContainer.getAll());
+    this.brigadistaBaseFocusContainer.destroy();
+    this.brigadistaBaseFocusContainer = null;
   }
 
   /** Exibe a fala de exaustão acima do brigadista que chegou ao mínimo de energia. */
@@ -1137,6 +1180,7 @@ export class GameScene extends Phaser.Scene {
       .setOrigin(0.5, 0.75)
       .setScale(440 / 2338);
     baseSprite.setDepth(15 + Math.floor(baseY + baseSprite.displayHeight * 0.25));
+    this.brigadistaBaseSprite = baseSprite;
     baseSprite.setInteractive({ useHandCursor: true });
     baseSprite.on('pointerup', (pointer: Phaser.Input.Pointer) => {
       // Arrastar o mapa não conta como toque na base
@@ -1439,6 +1483,7 @@ export class GameScene extends Phaser.Scene {
     SoundManager.playSelect();
     this.clearHouseFocus();
     this.clearPrefeituraFocus();
+    this.clearBrigadistaBaseFocus();
     this.events.emit('brigadista-base-clicked');
   }
 
@@ -1665,6 +1710,7 @@ export class GameScene extends Phaser.Scene {
     this.gameTimeMs += deltaMs;
     this.houseFocusContainer?.setScale(1 / this.cameraZoom);
     this.prefeituraFocusContainer?.setScale(1 / this.cameraZoom);
+    this.brigadistaBaseFocusContainer?.setScale(1 / this.cameraZoom);
 
     // Suporte adicional a setas / WASD para mover a câmera caso jogue no computador
     const camSpeed = 0.42 * deltaMs;

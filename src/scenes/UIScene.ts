@@ -1025,8 +1025,21 @@ export class UIScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
+    const liveStatus = this.bindLiveRecruitStatus({
+      plural: 'Bombeiros',
+      singular: 'bombeiro',
+      countText,
+      statusText,
+      recruitBtn,
+      recruitText,
+      getCount: () => this.gameScene.getBombeiroCount(),
+      getLimit: () => this.gameScene.getBombeiroLimit(),
+      getRemainingMs: () => this.gameScene.getBombeiroBaseCooldownRemainingMs()
+    });
+
     const closeModal = () => {
       SoundManager.unlock();
+      liveStatus.remove();
       if (this.gameScene) {
         this.gameScene.isStoryModalOpen = false;
       }
@@ -1237,8 +1250,21 @@ export class UIScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
+    const liveStatus = this.bindLiveRecruitStatus({
+      plural: 'Brigadistas',
+      singular: 'brigadista',
+      countText,
+      statusText,
+      recruitBtn,
+      recruitText,
+      getCount: () => this.gameScene.getBrigadistaCount(),
+      getLimit: () => this.gameScene.getBrigadistaLimit(),
+      getRemainingMs: () => this.gameScene.getBrigadistaBaseCooldownRemainingMs()
+    });
+
     const closeModal = () => {
       SoundManager.unlock();
+      liveStatus.remove();
       if (this.gameScene) {
         this.gameScene.isStoryModalOpen = false;
       }
@@ -1394,6 +1420,53 @@ export class UIScene extends Phaser.Scene {
       closeBtn,
       closeText
     ]);
+  }
+
+  /** Mantém contador, status e botão de recrutamento de uma base sincronizados com o tempo real. */
+  private bindLiveRecruitStatus(cfg: {
+    plural: string;
+    singular: string;
+    countText: Phaser.GameObjects.Text;
+    statusText: Phaser.GameObjects.Text;
+    recruitBtn: Phaser.GameObjects.Rectangle;
+    recruitText: Phaser.GameObjects.Text;
+    getCount: () => number;
+    getLimit: () => number;
+    getRemainingMs: () => number;
+  }): Phaser.Time.TimerEvent {
+    const refresh = (): void => {
+      const count = cfg.getCount();
+      const limit = cfg.getLimit();
+      const limitReached = count >= limit;
+      const remainingMs = cfg.getRemainingMs();
+      const onCooldown = remainingMs > 0;
+      const canRecruit = !limitReached && !onCooldown;
+
+      let statusLabel: string;
+      if (limitReached) {
+        statusLabel = `Limite de ${cfg.plural.toLowerCase()} atingido`;
+      } else if (onCooldown) {
+        const remainingSec = Math.ceil(remainingMs / 1000);
+        statusLabel = `Próximo ${cfg.singular} em ${Math.floor(remainingSec / 60)}:${String(remainingSec % 60).padStart(2, '0')}`;
+      } else {
+        statusLabel = `Pronto para formar um ${cfg.singular}`;
+      }
+
+      cfg.countText.setText(`${cfg.plural}: ${count}/${limit}`);
+      cfg.statusText.setText(statusLabel).setColor(canRecruit ? '#86efac' : '#fca5a5');
+      cfg.recruitBtn
+        .setFillStyle(canRecruit ? 0x9a3412 : 0x3f3f46, 1)
+        .setStrokeStyle(2, canRecruit ? 0xfdba74 : 0x71717a);
+      cfg.recruitText.setColor(canRecruit ? '#fff7ed' : '#a1a1aa');
+      if (canRecruit && !cfg.recruitBtn.input?.enabled) {
+        cfg.recruitBtn.setInteractive({ useHandCursor: true });
+      } else if (!canRecruit && cfg.recruitBtn.input?.enabled) {
+        cfg.recruitBtn.disableInteractive();
+      }
+    };
+
+    refresh();
+    return this.time.addEvent({ delay: 100, loop: true, callback: refresh });
   }
 
   public override update(): void {
