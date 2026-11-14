@@ -1708,13 +1708,16 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * Mantém 1 Trabalhador Rural para cada N focos ativos (mínimo fixo).
+   * Mantém 1 Trabalhador Rural para cada N focos ativos (entre o mínimo e o máximo fixos).
    * Ao diminuir o fogo, só remove os que estão ociosos, sem apagar nenhum foco.
    */
   private updateTrabalhadoresRurais(): void {
-    const { MIN_COUNT, FIRES_PER_WORKER } = BALANCE.TRABALHADOR_RURAL;
+    const { MIN_COUNT, MAX_COUNT, FIRES_PER_WORKER } = BALANCE.TRABALHADOR_RURAL;
     const activeFires = this.fireSystem.getActiveFires().length;
-    const targetCount = Math.max(MIN_COUNT, Math.ceil(activeFires / FIRES_PER_WORKER));
+    const targetCount = Math.min(
+      MAX_COUNT,
+      Math.max(MIN_COUNT, Math.ceil(activeFires / FIRES_PER_WORKER))
+    );
 
     while (this.trabalhadoresRurais.length < targetCount) {
       const countOf = (v: TrabalhadorRuralVariant) =>

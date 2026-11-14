@@ -461,9 +461,10 @@ export const BALANCE = {
     /** Energia consumida por segundo enquanto o bombeiro está fora da base */
     STAMINA_DRAIN_PER_SEC: 2
   },
-  /** Trabalhadores Rurais: quantidade acompanha os focos ativos, sem limite fixo */
+  /** Trabalhadores Rurais: quantidade acompanha os focos ativos, entre MIN_COUNT e MAX_COUNT */
   TRABALHADOR_RURAL: {
     MIN_COUNT: 2,
+    MAX_COUNT: 10,
     FIRES_PER_WORKER: 3,
     SPEED: 40,
     EXTINGUISH_POWER: 8,
