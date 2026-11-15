@@ -521,13 +521,13 @@ export class UIScene extends Phaser.Scene {
           this.gameScene.triggerLocalAction(LocalActionType.CIDADE_BARREIRA_EXAUSTAO)
       },
       {
-        key: LocalActionType.FLORESTA_REFLORESTAMENTO,
+        key: LocalActionType.FLORESTA_CHAMADO_ENCANTADOS,
         x: 540,
-        title: '🌱 PLANTIO',
-        sub: '+12% Floresta',
+        title: '🌿 ENCANTADOS',
+        sub: 'Curupira (3 min)',
         color: 0x14532d,
         onClick: () =>
-          this.gameScene.triggerLocalAction(LocalActionType.FLORESTA_REFLORESTAMENTO)
+          this.gameScene.triggerLocalAction(LocalActionType.FLORESTA_CHAMADO_ENCANTADOS)
       }
     ];
 
@@ -1560,7 +1560,7 @@ export class UIScene extends Phaser.Scene {
     const localTypes = [
       LocalActionType.CAMPO_ACEIRO,
       LocalActionType.CIDADE_BARREIRA_EXAUSTAO,
-      LocalActionType.FLORESTA_REFLORESTAMENTO
+      LocalActionType.FLORESTA_CHAMADO_ENCANTADOS
     ];
     for (const lt of localTypes) {
       const btn = this.defenseButtons.get(lt);

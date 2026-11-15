@@ -27,7 +27,6 @@ export class SectorSystem extends Phaser.Events.EventEmitter {
   private cooldownEnds: Map<string, number> = new Map();
   private cooldownDurations: Map<string, number> = new Map();
   private capturedArsonistsQueue = 0;
-  private urbanStress = 45; // 0 a 100 (Campo -> Cidade zera o estresse urbano conforme GDD)
 
   constructor(
     scene: Phaser.Scene,
@@ -53,20 +52,6 @@ export class SectorSystem extends Phaser.Events.EventEmitter {
   public addCapturedArsonist(): void {
     this.capturedArsonistsQueue++;
     this.emit('captures-updated', this.capturedArsonistsQueue);
-  }
-
-  public getUrbanStress(): number {
-    return this.urbanStress;
-  }
-
-  public update(deltaMs: number): void {
-    const dtSec = deltaMs / 1000;
-    const citySmoke = this.fireSystem.getSectorSmokeLevel(SectorType.CIDADE);
-    const ajusteAtivo = this.phaseSystem.isAjusteFiscalActive();
-
-    // Estresse urbano sobe com Ajuste Fiscal e Fumaça na Cidade
-    const stressRate = (ajusteAtivo ? 1.1 : 0.35) + citySmoke * 0.65;
-    this.urbanStress = Phaser.Math.Clamp(this.urbanStress + stressRate * dtSec, 0, 100);
   }
 
   public getCooldownRemainingRatio(actionKey: string): number {
@@ -140,13 +125,12 @@ export class SectorSystem extends Phaser.Events.EventEmitter {
       }
 
       case IntegratedActionType.CAMPO_PARA_CIDADE: {
-        // Campo -> Cidade: Envio de alimentos para zerar estresse urbano (+Consciência escalada)
+        // Campo -> Cidade: Envio de alimentos (+Consciência escalada)
         this.triggerCooldown(
           type,
           BALANCE.COOLDOWNS.INTEGRATED_CAMPO_CIDADE,
           SectorType.CAMPO
         );
-        this.urbanStress = 0;
         // Reduz recargas urbanas ativas graças ao mutirão de alimentos
         const cityEnd = this.cooldownEnds.get(IntegratedActionType.CIDADE_PARA_FLORESTA);
         if (cityEnd) {
@@ -190,11 +174,12 @@ export class SectorSystem extends Phaser.Events.EventEmitter {
   }
 
   /**
-   * Executa Ações Setoriais Locais (Cidade: Exaustão | Campo: Aceiros | Floresta: Reflorestamento/Encantados)
+   * Executa Ações Setoriais Locais (Cidade: Exaustão | Campo: Aceiros | Floresta: Chamado aos Encantados).
+   * `onInvokeCurupira` devolve a posição da aldeia que invocou, ou null se a invocação não puder acontecer.
    */
   public executeLocalAction(
     type: LocalActionType,
-    onReplantForest: (points: number) => void
+    onInvokeCurupira: () => { x: number; y: number } | null
   ): boolean {
     if (!this.isActionReady(type)) return false;
 
@@ -224,11 +209,11 @@ export class SectorSystem extends Phaser.Events.EventEmitter {
         break;
       }
 
-      case LocalActionType.FLORESTA_REFLORESTAMENTO: {
-        this.triggerCooldown(type, BALANCE.COOLDOWNS.LOCAL_FLORESTA_REFLORESTAR, SectorType.FLORESTA);
-        onReplantForest(12);
-        const pt = getRandomPointInSector(SectorType.FLORESTA, 60);
-        this.spawnFloatingText(pt.x, pt.y, '🌱 Reflorestamento +12% Mata!', '#4ade80');
+      case LocalActionType.FLORESTA_CHAMADO_ENCANTADOS: {
+        const village = onInvokeCurupira();
+        if (!village) return false;
+        this.triggerCooldown(type, BALANCE.COOLDOWNS.LOCAL_FLORESTA_ENCANTADOS, SectorType.FLORESTA);
+        this.spawnFloatingText(village.x, village.y - 40, '🌿 Curupira invocado!', '#4ade80');
         break;
       }
     }

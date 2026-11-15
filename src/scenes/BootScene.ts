@@ -59,6 +59,11 @@ export class BootScene extends Phaser.Scene {
       frameWidth: 130,
       frameHeight: 185
     });
+    // Frames gerados por scripts/create_curupira_spritesheet.js: 0-4 caminhada, 5-7 ação, 8-10 replantio
+    this.load.spritesheet('curupira', 'assets/curupira.png', {
+      frameWidth: 160,
+      frameHeight: 160
+    });
     this.load.spritesheet('incendiario', 'assets/incendiario.png', {
       frameWidth: 128,
       frameHeight: 128
@@ -75,7 +80,28 @@ export class BootScene extends Phaser.Scene {
     this.createBrigadaComunitariaAnimations();
     this.createTrabalhadorRuralAnimations();
     this.createIncendiarioAnimations();
+    this.createCurupiraAnimations();
     this.scene.start('MenuScene');
+  }
+
+  // Frames definidos em scripts/create_curupira_spritesheet.js
+  private createCurupiraAnimations(): void {
+    const defs: Array<{ key: string; frames: number[]; frameRate: number }> = [
+      { key: 'curupira_idle', frames: [7], frameRate: 1 },
+      { key: 'curupira_walk', frames: [0, 1, 2, 3, 4], frameRate: 8 },
+      { key: 'curupira_extinguish', frames: [5, 6], frameRate: 6 },
+      { key: 'curupira_replant', frames: [8, 9, 10], frameRate: 4 }
+    ];
+    for (const def of defs) {
+      if (!this.anims.exists(def.key)) {
+        this.anims.create({
+          key: def.key,
+          frames: this.anims.generateFrameNumbers('curupira', { frames: def.frames }),
+          frameRate: def.frameRate,
+          repeat: -1
+        });
+      }
+    }
   }
 
   // Frames definidos em scripts/create_incendiario_spritesheet.js

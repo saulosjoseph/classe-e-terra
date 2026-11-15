@@ -69,7 +69,11 @@ Arquivos de imagem de referência (`*.jpg`) ficam na raiz do repositório e serv
 - Mensagens de commit seguem **Conventional Commits** em inglês com descrição curta, como no histórico atual: `feat: ...`, `refactor: ...`. Use o mesmo padrão.
 - Não commite `node_modules/`, `dist/` ou arquivos `.env` (já cobertos pelo `.gitignore`).
 - Antes de concluir uma tarefa, rode `pnpm build` e confirme que não há erros de tipo.
-- Ao alterar mecânicas de jogo, atualize `classe-e-terra.md` se o comportamento documentado mudar. Mantenha o conteúdo do GDD consistente com o código.
+
+## Documentação
+
+- **Mecânicas de jogo:** toda alteração na mecânica do jogo deve ser documentada em [classe-e-terra.md](./classe-e-terra.md). Mantenha o GDD consistente com o código.
+- **Configurações, código e arquitetura:** toda configuração relacionada ao projeto e ao código, bem como toda mudança de arquitetura (ex.: opções de `vite.config.ts`, `tsconfig.json`, `main.ts`, scripts de `scripts/`, valores de `src/config/`, estrutura de pastas, responsabilidades de cenas, sistemas e entidades, comandos e convenções), deve ser documentada neste `AGENTS.md`.
 
 ## Cuidados
 

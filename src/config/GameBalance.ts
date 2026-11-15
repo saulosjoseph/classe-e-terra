@@ -436,7 +436,7 @@ export const BALANCE = {
     INTEGRATED_FLORESTA_CAMPO: 7500,
     LOCAL_CIDADE_EXAUSTAO: 9000,
     LOCAL_CAMPO_ACEIRO: 9500,
-    LOCAL_FLORESTA_REFLORESTAR: 10000,
+    LOCAL_FLORESTA_ENCANTADOS: 180000,
     SPAWN_BRIGADISTA_BASE: 120000,
     SPAWN_BOMBEIRO_BASE: 120000,
     SPAWN_GUARDA: 14000
@@ -470,6 +470,20 @@ export const BALANCE = {
     EXTINGUISH_POWER: 8,
     STAMINA_DRAIN_PER_SEC: 1.5,
     STAMINA_REGEN_PER_SEC: 1
+  },
+  /** Curupira, encantado invocado pelas aldeias: age sozinho e não cansa */
+  CURUPIRA: {
+    MAX_ACTIVE: 4,
+    LIFETIME_MS: 60000,
+    SPEED: 240,
+    EXTINGUISH_POWER: 60,
+    BOSS_DAMAGE_PER_SEC: 20,
+    /** Tempo de replantio por árvore queimada restaurada */
+    REPLANT_MS: 10000,
+    /** Distância até a árvore queimada para começar a replantar */
+    REPLANT_RANGE: 40,
+    /** Distância até o foco para apagá-lo */
+    EXTINGUISH_RANGE: 46
   },
   /** Doação de cada casa da cidade às brigadas voluntárias */
   HOUSE_DONATION: {

@@ -45,6 +45,7 @@ import { BossFortress } from '../entities/BossFortress';
 import { Brigadista } from '../entities/Brigadista';
 import { Bombeiro } from '../entities/Bombeiro';
 import { CarroPopular } from '../entities/CarroPopular';
+import { Curupira } from '../entities/Curupira';
 import { GuardaFlorestal } from '../entities/GuardaFlorestal';
 import { Incendiario } from '../entities/Incendiario';
 import { TrabalhadorRural, TrabalhadorRuralVariant } from '../entities/TrabalhadorRural';
@@ -227,6 +228,7 @@ export class GameScene extends Phaser.Scene {
   private bombeiros: Bombeiro[] = [];
   private guardas: GuardaFlorestal[] = [];
   private trabalhadoresRurais: TrabalhadorRural[] = [];
+  private curupiras: Curupira[] = [];
   private nextUnitId = 1;
 
   private brigadistaBaseReadyAt = 0;
@@ -308,6 +310,7 @@ export class GameScene extends Phaser.Scene {
     this.bombeiros = [];
     this.guardas = [];
     this.trabalhadoresRurais = [];
+    this.curupiras = [];
     this.nextUnitId = 1;
     this.brigadistaBaseReadyAt = 0;
     this.bombeiroBaseReadyAt = 0;
@@ -1923,7 +1926,13 @@ export class GameScene extends Phaser.Scene {
   }
 
   public getAllUnits(): Unit[] {
-    return [...this.brigadistas, ...this.bombeiros, ...this.guardas, ...this.trabalhadoresRurais];
+    return [
+      ...this.brigadistas,
+      ...this.bombeiros,
+      ...this.guardas,
+      ...this.trabalhadoresRurais,
+      ...this.curupiras
+    ];
   }
 
   public getForestHealth(): number {
@@ -1956,29 +1965,90 @@ export class GameScene extends Phaser.Scene {
     tree.scorch = this.fireSystem.createScorchMark(tree.x, tree.y);
   }
 
-  /** Replanta árvores queimadas (até maxTrees), restaurando o solo e a saúde associada */
-  private replantTrees(maxTrees: number): number {
-    let replanted = 0;
-    for (const tree of this.forestTrees) {
-      if (replanted >= maxTrees) break;
-      if (tree.state !== 'burned') continue;
-      for (const obj of tree.scorch) obj.destroy();
-      tree.scorch = [];
-      tree.state = 'healthy';
-      this.applyTreeAppearance(tree);
-      replanted++;
-    }
-    return replanted;
+  /** Restaura uma árvore queimada: remove a marca de queimada e devolve a árvore saudável */
+  private restoreTree(tree: ForestTree): void {
+    for (const obj of tree.scorch) obj.destroy();
+    tree.scorch = [];
+    tree.state = 'healthy';
+    this.applyTreeAppearance(tree);
   }
 
-  /** Reflorestamento: recupera `points` pontos de saúde replantando as árvores que correspondem à parcela das árvores */
-  public replantForest(points: number): void {
-    const treePoints = points / TREE_FIRE.TREE_HEALTH_WEIGHT;
-    const treesNeeded = Math.round(
-      (treePoints / 100) * this.forestTrees.length * TREE_FIRE.COLLAPSE_BURNED_RATIO
+  /** Curupira: replanta a árvore queimada em (x, y). Devolve false se ela não estiver mais queimada */
+  public replantTreeAt(x: number, y: number): boolean {
+    const tree = this.forestTrees.find((t) => t.state === 'burned' && t.x === x && t.y === y);
+    if (!tree) return false;
+    this.restoreTree(tree);
+    return true;
+  }
+
+  /** Árvore queimada mais próxima de (x, y), para o Curupira replantar */
+  public findNearestBurnedTree(x: number, y: number): { x: number; y: number } | null {
+    let nearest: ForestTree | null = null;
+    let nearestDist = Infinity;
+    for (const tree of this.forestTrees) {
+      if (tree.state !== 'burned') continue;
+      const d = getIsoDistance(x, y, tree.x, tree.y);
+      if (d < nearestDist) {
+        nearestDist = d;
+        nearest = tree;
+      }
+    }
+    return nearest;
+  }
+
+  /**
+   * Chamado pelas aldeias: invoca um Curupira na aldeia mais próxima do foco mais intenso.
+   * Devolve a posição da aldeia, ou null se o limite de Curupiras em campo já foi atingido.
+   */
+  private invokeCurupira(): { x: number; y: number } | null {
+    if (this.curupiras.length >= BALANCE.CURUPIRA.MAX_ACTIVE) return null;
+
+    const intensest = this.fireSystem
+      .getActiveFires()
+      .reduce<ActiveFireInstance | null>(
+        (best, fire) => (!best || fire.data.intensity > best.data.intensity ? fire : best),
+        null
+      );
+    let village = ALDEIA_POSITIONS[Math.floor(Math.random() * ALDEIA_POSITIONS.length)];
+    if (intensest) {
+      village = ALDEIA_POSITIONS.reduce((best, v) =>
+        getIsoDistance(v.x, v.y, intensest.data.x, intensest.data.y) <
+        getIsoDistance(best.x, best.y, intensest.data.x, intensest.data.y)
+          ? v
+          : best
+      );
+    }
+
+    const spawn = getCollisionSystem(this).snapToFree(village.x, village.y + 60);
+    const curupira = new Curupira(
+      this,
+      `curupira_${this.nextUnitId++}`,
+      spawn.x,
+      spawn.y,
+      this.clock.now() + BALANCE.CURUPIRA.LIFETIME_MS
     );
-    this.replantTrees(treesNeeded);
-    this.forestHealth = this.computeForestHealth();
+    this.curupiras.push(curupira);
+    curupira.on('unit-tapped', (clicked: Unit) => {
+      this.followEntity(clicked);
+    });
+    return { x: village.x, y: village.y };
+  }
+
+  /** Atualiza os Curupiras e remove os que terminaram a duração em campo */
+  private updateCurupiras(deltaMs: number): void {
+    const now = this.clock.now();
+    for (const curupira of this.curupiras) {
+      if (now >= curupira.expiresAt) continue;
+      curupira.update(deltaMs, this.fireSystem, this, this.boss);
+    }
+    this.curupiras = this.curupiras.filter((curupira) => {
+      if (now < curupira.expiresAt) return true;
+      if (this.getFollowedEntity() === curupira) {
+        this.stopFollowingEntity();
+      }
+      curupira.destroy();
+      return false;
+    });
   }
 
   public triggerIntegratedAction(type: IntegratedActionType): boolean {
@@ -1997,7 +2067,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   public triggerLocalAction(type: LocalActionType): boolean {
-    return this.sectorSystem.executeLocalAction(type, (points) => this.replantForest(points));
+    return this.sectorSystem.executeLocalAction(type, () => this.invokeCurupira());
   }
 
   private captureArsonist(arsonist: Incendiario): void {
@@ -2097,8 +2167,6 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
-    this.sectorSystem.update(deltaMs);
-
     this.spawnerSystem.update(
       deltaMs,
       this.difficulty.arsonistSpawnIntervalMs,
@@ -2134,6 +2202,8 @@ export class GameScene extends Phaser.Scene {
     }
     this.updateTrabalhadoresRurais();
     this.updateTrabalhadorSpeechBubble();
+
+    this.updateCurupiras(deltaMs);
 
     const { forestDamage } = this.fireSystem.update(
       deltaMs,

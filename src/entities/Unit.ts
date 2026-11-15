@@ -110,6 +110,8 @@ export abstract class Unit extends Phaser.Events.EventEmitter {
         return 'Guarda Florestal';
       case UnitType.TRABALHADOR_RURAL:
         return 'Trabalhador Rural';
+      case UnitType.CURUPIRA:
+        return 'Curupira';
       default:
         return 'Unidade Popular';
     }
