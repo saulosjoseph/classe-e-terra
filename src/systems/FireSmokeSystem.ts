@@ -34,8 +34,6 @@ const PROBE_DIRECTIONS: ReadonlyArray<readonly [number, number]> = [
   [1, 0], [-1, 0], [0, 1], [0, -1],
   [0.7071, 0.7071], [0.7071, -0.7071], [-0.7071, 0.7071], [-0.7071, -0.7071]
 ];
-/** Tentativas de expansão bloqueadas seguidas até o foco ser considerado esgotado */
-const STALL_LIMIT = 3;
 /** Perda de intensidade por segundo de um foco esgotado, que se apaga sozinho */
 const EXHAUSTED_DECAY_PER_SEC = 12;
 /** Intervalo mínimo entre redesenhos das barras de intensidade */
@@ -79,9 +77,7 @@ export interface ActiveFireInstance {
   hitZone: Phaser.GameObjects.Zone;
   /** Último estado visível das barras (nível de fumaça + intensidade inteira) */
   ringStateKey: number;
-  /** Tentativas de expansão seguidas bloqueadas por terreno já queimado */
-  stalledTicks: number;
-  /** Sem terreno para crescer: não cresce mais e se apaga aos poucos */
+  /** Todos os pontos ao redor já queimados: não cresce mais e se apaga sozinho */
   exhausted: boolean;
 }
 
@@ -254,9 +250,7 @@ export class FireSmokeSystem extends Phaser.Events.EventEmitter {
       haloSprite,
       hitZone,
       ringStateKey: -1,
-      stalledTicks: 0,
       exhausted: false    };
-
     hitZone.on('pointerup', (pointer: Phaser.Input.Pointer) => {
       if (pointer.getDistance() < 12) {
         this.emit('fire-tapped', instance);
@@ -632,11 +626,7 @@ export class FireSmokeSystem extends Phaser.Events.EventEmitter {
             const dist = Phaser.Math.Between(55, 92);
             const targetX = inst.data.x + Math.cos(spreadAngle) * dist;
             const targetY = inst.data.y + Math.sin(spreadAngle) * (dist * ISO_Y_RATIO);
-            if (this.isBurned(targetX, targetY)) {
-              inst.stalledTicks++;
-              if (inst.stalledTicks >= STALL_LIMIT) inst.exhausted = true;
-            } else {
-              inst.stalledTicks = 0;
+            if (!this.isBurned(targetX, targetY)) {
               this.spawnFire(targetX, targetY, 22);
             }
           }
