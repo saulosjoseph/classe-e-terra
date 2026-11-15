@@ -84,7 +84,7 @@ return this.sectorSystem.executeEncantadoInvocation(
 3. Verifica se cooldown está pronto: isActionReady(cooldownKey)
 4. Se não, retorna false
 5. Chama onInvoke() → GameScene.spawnCurupira(village)
-6. Registra cooldown por 3 minutos
+6. Registra cooldown por 1 minuto e 20 segundos (80 segundos)
 ```
 
 ### 6. GameScene cria a unidade
@@ -136,14 +136,14 @@ return this.sectorSystem.getEncantadoCooldownRemainingMs(villageIndex, 'curupira
 - **Classe**: `src/entities/Curupira.ts`
 - **Atributo**: `villageIndex: number` (qual aldeia invocou)
 - **Duração**: 60 segundos
-- **Cooldown**: 3 minutos por aldeia
+- **Cooldown**: 1 minuto e 20 segundos (80 segundos) por aldeia
 - **Limite por aldeia**: 1 por vez
 
 ### Mãe da Mata
 - **Classe**: `src/entities/MaeDaMata.ts`
 - **Atributo**: `villageIndex: number` (qual aldeia invocou)
 - **Duração**: 60 segundos
-- **Cooldown**: 3 minutos por aldeia
+- **Cooldown**: 1 minuto e 20 segundos (80 segundos) por aldeia
 - **Limite por aldeia**: 1 por vez
 
 ## Exemplos de Cenários
@@ -152,15 +152,15 @@ return this.sectorSystem.getEncantadoCooldownRemainingMs(villageIndex, 'curupira
 
 ```
 T=0s: Invoca Curupira na aldeia 0
-      - CURUPIRA_VILLAGE_0 = cooldown até T=180s
+      - CURUPIRA_VILLAGE_0 = cooldown até T=80s
 
 T=5s: Invoca Curupira na aldeia 1
-      - CURUPIRA_VILLAGE_1 = cooldown até T=185s
+      - CURUPIRA_VILLAGE_1 = cooldown até T=85s
       (aldeias 0 e 1 têm cooldowns independentes)
 
 T=60s: Curupira da aldeia 0 expira
        - Aldeia 0 fica livre para novo encantado
-       - CURUPIRA_VILLAGE_0 ainda em cooldown até T=180s
+       - CURUPIRA_VILLAGE_0 ainda em cooldown até T=80s
        (não pode invocar Curupira, mas pode invocar Mãe da Mata!)
 ```
 
@@ -203,8 +203,8 @@ Obs: Atualmente verifica por tipo específico!
 ### Teste 2: Limite por aldeia
 1. Clique na aldeia 0, invoque Curupira
 2. Aguarde 60 segundos (Curupira expira)
-3. Na mesma aldeia 0, invoque Curupira novamente, dentro dos 3 minutos
-4. **Esperado**: Cooldown mostra "Recarga: 2:XX" mas você pode invocar assim que expira o encantado anterior
+3. Na mesma aldeia 0, invoque Curupira novamente, dentro de 1m20s
+4. **Esperado**: Cooldown mostra "Recarga: 1:XX" mas você pode invocar assim que expira o encantado anterior
 
 ### Teste 3: Limite global
 1. Invoque encantados em todas as 4 aldeias até ter 4 em campo
@@ -225,8 +225,8 @@ Para adicionar suporte a novos encantados ou sistemas:
 Apenas altere a constante em `GameBalance.ts`:
 ```typescript
 COOLDOWNS: {
-  LOCAL_FLORESTA_ENCANTADOS: 180000,  // Curupira
-  LOCAL_MAE_DA_MATA: 180000,           // Mãe da Mata
+  LOCAL_FLORESTA_ENCANTADOS: 80000,  // Curupira (1 minuto 20 segundos)
+  LOCAL_MAE_DA_MATA: 80000,           // Mãe da Mata (1 minuto 20 segundos)
 }
 ```
 
