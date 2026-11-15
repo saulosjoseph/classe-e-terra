@@ -63,6 +63,23 @@ function installCrispTextDefaults(): void {
   };
 }
 
+/**
+ * Desabilita o pause automático quando a janela/aba perde o foco.
+ * Isso permite que o jogo continue rodando em background.
+ */
+function disableAutoBlur(game: Phaser.Game): void {
+  // Disabilita o evento blur padrão do Phaser que pausa o jogo
+  game.events.off(Phaser.Core.Events.BLUR);
+  
+  // Desabilita também o sleep do canvas
+  if (game.canvas) {
+    game.canvas.addEventListener('blur', (event: Event) => {
+      event.preventDefault();
+      event.stopPropagation();
+    }, true);
+  }
+}
+
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
   parent: 'game-container',
@@ -73,7 +90,8 @@ const config: Phaser.Types.Core.GameConfig = {
   render: {
     antialias: true,
     pixelArt: false,
-    roundPixels: true
+    roundPixels: true,
+    desynchronized: true
   },
   scale: {
     mode: Phaser.Scale.FIT,
@@ -95,7 +113,9 @@ installCrispTextDefaults();
 
 fontsReady.then(() => {
   const game = new Phaser.Game(config);
+  disableAutoBlur(game);
   setupAutoLandscapeFullscreen(game);
   (window as unknown as { game: Phaser.Game }).game = game;
 });
+
 
