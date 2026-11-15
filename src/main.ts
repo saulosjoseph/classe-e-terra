@@ -71,37 +71,36 @@ function disableAutoBlur(game: Phaser.Game): void {
   // Desabilita eventos de blur do Phaser que pausam o jogo
   game.events.off(Phaser.Core.Events.BLUR);
   game.events.off(Phaser.Core.Events.HIDDEN);
+  game.events.off(Phaser.Core.Events.PAUSE);
   
-  // Desabilita também os handlers padrão de focus/blur
+  // Re-attach listeners para prevenir que o Phaser pause
+  game.events.on(Phaser.Core.Events.BLUR, () => {
+    // Fazer nada - ignora o blur
+  });
+  
+  game.events.on(Phaser.Core.Events.HIDDEN, () => {
+    // Fazer nada - ignora quando a aba fica oculta
+  });
+  
+  // Desabilita também os handlers padrão de focus/blur no canvas
   if (game.canvas) {
     game.canvas.addEventListener('blur', (event: Event) => {
       event.preventDefault();
       event.stopPropagation();
     }, true);
-    
-    game.canvas.addEventListener('focusout', (event: Event) => {
-      event.preventDefault();
-      event.stopPropagation();
-    }, true);
   }
   
-  // Previne pause quando o documento fica oculto
-  document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) return;
-    // Document ficou oculto, mas não vamos pausar o jogo
-    if (game.isRunning()) {
-      // Garante que o jogo continue rodando
-      if (game.loop.isPaused) {
-        game.loop.wake();
-      }
+  // Previne pause ao mudança de visibilidade
+  const handleVisibilityChange = () => {
+    if (document.hidden) {
+      // Resume se o jogo pausou
+      game.events.emit(Phaser.Core.Events.RESUME);
     }
-  }, true);
+  };
   
-  // Previne pause quando a janela perde foco
+  document.addEventListener('visibilitychange', handleVisibilityChange, true);
   window.addEventListener('blur', () => {
-    if (game.isRunning() && game.loop.isPaused) {
-      game.loop.wake();
-    }
+    game.events.emit(Phaser.Core.Events.RESUME);
   }, true);
 }
 
