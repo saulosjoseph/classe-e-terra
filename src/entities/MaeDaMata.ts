@@ -12,7 +12,7 @@ export interface MaeDaMataForestOps {
 
 type MaeDaMataActivity = 'none' | 'water' | 'replant';
 
-/** Encantado invocado pelas aldeias: apaga focos com água e replanta a floresta. Não cansa. */
+/** Encantado invocado pelas aldeias: replanta árvores queimadas da floresta. Não cansa. */
 export class MaeDaMata extends Unit {
   /** Instante (no GameClock) em que o encantado deixa a partida */
   public readonly expiresAt: number;
@@ -40,52 +40,38 @@ export class MaeDaMata extends Unit {
   }
 
   public update(deltaMs: number, fireSystem: FireSmokeSystem, forest: MaeDaMataForestOps): void {
-    const dtSec = deltaMs / 1000;
     const smokeAtPos = fireSystem.getSmokeLevelAtPoint(this.x, this.y);
-    const { EXTINGUISH_RANGE, EXTINGUISH_POWER, REPLANT_RANGE, REPLANT_MS } = BALANCE.MAE_DA_MATA;
+    const { REPLANT_RANGE, REPLANT_MS } = BALANCE.MAE_DA_MATA;
 
-    const fire = fireSystem.findNearestFire(this.x, this.y);
     this.activity = 'none';
 
-    if (fire) {
-      // Prioridade: apagar o foco mais próximo com água
-      this.setCommandTarget(fire.data.x, fire.data.y);
+    // Replanta a árvore queimada mais próxima
+    this.retargetInMs -= deltaMs;
+    if (!this.replantTarget || this.retargetInMs <= 0) {
+      this.replantTarget = forest.findNearestBurnedTree(this.x, this.y);
+      this.retargetInMs = 1000;
+    }
+    if (this.replantTarget) {
+      const tree = this.replantTarget;
+      this.setCommandTarget(tree.x, tree.y);
       this.moveStep(deltaMs, smokeAtPos);
-      this.replantProgressMs = 0;
-      if (getIsoDistance(this.x, this.y, fire.data.x, fire.data.y) <= EXTINGUISH_RANGE) {
-        fireSystem.extinguishFire(fire.data.id, EXTINGUISH_POWER * dtSec);
-        this.activity = 'water';
-        this.faceTowards(fire.data.x);
-      }
-    } else {
-      // Sem focos, replanta a árvore queimada mais próxima
-      this.retargetInMs -= deltaMs;
-      if (!this.replantTarget || this.retargetInMs <= 0) {
-        this.replantTarget = forest.findNearestBurnedTree(this.x, this.y);
-        this.retargetInMs = 1000;
-      }
-      if (this.replantTarget) {
-        const tree = this.replantTarget;
-        this.setCommandTarget(tree.x, tree.y);
-        this.moveStep(deltaMs, smokeAtPos);
-        if (getIsoDistance(this.x, this.y, tree.x, tree.y) <= REPLANT_RANGE) {
-          this.activity = 'replant';
-          this.faceTowards(tree.x);
-          this.replantProgressMs += deltaMs;
-          if (this.replantProgressMs >= REPLANT_MS) {
-            this.replantProgressMs = 0;
-            forest.replantTreeAt(tree.x, tree.y);
-            this.replantTarget = null;
-            this.retargetInMs = 0;
-          }
-        } else {
+      if (getIsoDistance(this.x, this.y, tree.x, tree.y) <= REPLANT_RANGE) {
+        this.activity = 'replant';
+        this.faceTowards(tree.x);
+        this.replantProgressMs += deltaMs;
+        if (this.replantProgressMs >= REPLANT_MS) {
           this.replantProgressMs = 0;
+          forest.replantTreeAt(tree.x, tree.y);
+          this.replantTarget = null;
+          this.retargetInMs = 0;
         }
       } else {
         this.replantProgressMs = 0;
-        this.setCommandTarget(this.x, this.y);
-        this.moveStep(deltaMs, smokeAtPos);
       }
+    } else {
+      this.replantProgressMs = 0;
+      this.setCommandTarget(this.x, this.y);
+      this.moveStep(deltaMs, smokeAtPos);
     }
 
     this.updateAnimation();

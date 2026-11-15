@@ -75,6 +75,7 @@ export class UIScene extends Phaser.Scene {
   private readonly minimapY = MAP_TOP_Y + 46;
   private readonly minimapRadius = 36;
   private lastMinimapAt = -Infinity;
+  private barPositions!: { x: number; y1: number; y2: number; width: number; height: number };
 
   constructor() {
     super('UIScene');
@@ -88,9 +89,11 @@ export class UIScene extends Phaser.Scene {
   }
 
   public create(): void {
-    this.createTopHud();
+    // Menu superior removido - informações aparecem como badges
+    // this.createTopHud();
     this.createMapNavigationOverlay();
-    this.createBottomThumbPanel();
+    // Menu de ações removido
+    // this.createBottomThumbPanel();
     this.createPhaseBanner();
     this.createStoryModal();
 
@@ -125,52 +128,45 @@ export class UIScene extends Phaser.Scene {
   }
 
   private createTopHud(): void {
+    // Fundo minimalista
     this.add
-      .rectangle(GAME_WIDTH / 2, HUD_TOP_HEIGHT / 2, GAME_WIDTH, HUD_TOP_HEIGHT, 0x090d0a, 0.96)
-      .setStrokeStyle(1.5, 0x27272a);
+      .rectangle(GAME_WIDTH / 2, HUD_TOP_HEIGHT / 2, GAME_WIDTH, HUD_TOP_HEIGHT, 0x090d0a, 0.85)
+      .setStrokeStyle(1, 0x27272a);
 
-    this.topBarsGraphics = this.add.graphics();
-
-    // Saúde da Floresta (Esquerda: x=14..184)
-    this.add.text(14, 7, '🌳 FLORESTA', {
+    // Saúde da Floresta (Esquerda)
+    this.add.text(14, 12, '🌳 FLORESTA:', {
       fontSize: '11px',
       fontStyle: 'bold',
       color: '#4ade80'
     });
 
     this.forestValueText = this.add
-      .text(184, 7, '100%', {
+      .text(104, 12, '100%', {
         fontSize: '11px',
         fontStyle: 'bold',
         color: '#ffffff'
       })
-      .setOrigin(1, 0);
+      .setOrigin(0, 0);
 
-    // Fase Política e Status (Centro: x=360)
+    // Fase Política e Status (Centro)
     this.phaseTitleText = this.add
-      .text(GAME_WIDTH / 2, 14, 'Fase 1: Resistência Sufocada', {
-        fontSize: '12px',
+      .text(GAME_WIDTH / 2, 12, 'Fase 1: Resistência', {
+        fontSize: '11px',
         fontStyle: 'bold',
         color: '#fde047'
       })
-      .setOrigin(0.5);
+      .setOrigin(0.5, 0);
 
-    this.statusChipsText = this.add
-      .text(GAME_WIDTH / 2, 34, '', {
-        fontSize: '9.5px',
-        color: '#d4d4d8'
-      })
-      .setOrigin(0.5);
-
-    // Consciência Coletiva (Direita: x=536..706)
-    this.add.text(536, 7, '✊ CONSCIÊNCIA', {
+    // Consciência de Classe (Direita)
+    this.add.text(GAME_WIDTH - 14, 12, '✊ CONSCIÊNCIA:', {
       fontSize: '11px',
       fontStyle: 'bold',
       color: '#38bdf8'
-    });
+    })
+    .setOrigin(1, 0);
 
     this.consciousnessValueText = this.add
-      .text(GAME_WIDTH - 14, 7, '0%', {
+      .text(GAME_WIDTH - 14, 28, '0%', {
         fontSize: '11px',
         fontStyle: 'bold',
         color: '#ffffff'
@@ -223,146 +219,91 @@ export class UIScene extends Phaser.Scene {
       this.gameScene.stopFollowingEntity();
     });
 
-    const btnCity = this.add
-      .text(12, MAP_BOTTOM_Y - 26, '🏙️ IR P/ CIDADE', {
+    // Fase Política no canto inferior esquerdo (como badge)
+    this.phaseTitleText = this.add
+      .text(12, GAME_HEIGHT - 12, '', {
         fontSize: '10px',
         fontStyle: 'bold',
-        color: '#ffffff',
-        backgroundColor: '#78350fdd',
-        padding: { x: 6, y: 4 }
+        color: '#fde047',
+        backgroundColor: '#090d0acc',
+        padding: { x: 6, y: 3 }
       })
-      .setInteractive({ useHandCursor: true })
+      .setOrigin(0, 1)
       .setDepth(80);
 
-    btnCity.on('pointerdown', () => {
-      SoundManager.unlock();
-      SoundManager.playSelect();
-      this.gameScene.centerCameraOnPoint(WORLD_CENTER_X, WORLD_CENTER_Y, true);
-    });
+    // Barras de Saúde e Consciência no canto inferior direito
+    const barsX = GAME_WIDTH - 140;
+    const barY1 = GAME_HEIGHT - 42;
+    const barY2 = GAME_HEIGHT - 22;
+    const barWidth = 130;
+    const barHeight = 14;
 
-    const btnAlert = this.add
-      .text(136, MAP_BOTTOM_Y - 26, '🔥 IR P/ FOGO', {
-        fontSize: '10px',
-        fontStyle: 'bold',
-        color: '#fef08a',
-        backgroundColor: '#991b1bdd',
-        padding: { x: 6, y: 4 }
-      })
-      .setInteractive({ useHandCursor: true })
-      .setDepth(80);
+    // Label "Saúde da Floresta"
+    this.add.text(barsX, barY1 - 2, '🌳 Saúde:', {
+      fontSize: '9px',
+      fontStyle: 'bold',
+      color: '#4ade80'
+    })
+    .setOrigin(0, 1)
+    .setDepth(80);
 
-    btnAlert.on('pointerdown', () => {
-      SoundManager.unlock();
-      SoundManager.playSelect();
-      const fires = this.gameScene.fireSystem.getActiveFires();
-      const arsonists = this.gameScene.spawnerSystem.getArsonists();
-      if (fires.length > 0) {
-        this.gameScene.centerCameraOnPoint(fires[0].data.x, fires[0].data.y, true);
-      } else if (arsonists.length > 0) {
-        this.gameScene.centerCameraOnPoint(arsonists[0].x, arsonists[0].y, true);
-      } else {
-        this.gameScene.centerCameraOnPoint(
-          WORLD_CENTER_X,
-          WORLD_CENTER_Y + CAMPO_RADIUS_Y + 40,
-          true
-        );
-      }
-    });
+    // Barra de Saúde (background)
+    this.add
+      .rectangle(barsX + barWidth / 2, barY1 + 6, barWidth, barHeight, 0x18181b, 1)
+      .setStrokeStyle(1, 0x4ade80)
+      .setDepth(79);
 
-    const btnZoomIn = this.add
-      .text(244, MAP_BOTTOM_Y - 26, '🔍 +', {
-        fontSize: '10px',
-        fontStyle: 'bold',
-        color: '#ffffff',
-        backgroundColor: '#1e3a8add',
-        padding: { x: 7, y: 4 }
-      })
-      .setInteractive({ useHandCursor: true })
-      .setDepth(80);
+    // Barra de Saúde (preenchimento) - Graphics para desenhar dinamicamente
+    this.topBarsGraphics = this.add.graphics().setDepth(80);
 
-    btnZoomIn.on('pointerdown', () => {
-      this.gameScene.zoomIn();
-    });
+    // Label "Consciência"
+    this.add.text(barsX, barY2 - 2, '✊ Consciência:', {
+      fontSize: '9px',
+      fontStyle: 'bold',
+      color: '#38bdf8'
+    })
+    .setOrigin(0, 1)
+    .setDepth(80);
 
-    const btnZoomOut = this.add
-      .text(290, MAP_BOTTOM_Y - 26, '🔍 -', {
-        fontSize: '10px',
-        fontStyle: 'bold',
-        color: '#ffffff',
-        backgroundColor: '#1e3a8add',
-        padding: { x: 7, y: 4 }
-      })
-      .setInteractive({ useHandCursor: true })
-      .setDepth(80);
+    // Barra de Consciência (background)
+    this.add
+      .rectangle(barsX + barWidth / 2, barY2 + 6, barWidth, barHeight, 0x18181b, 1)
+      .setStrokeStyle(1, 0x38bdf8)
+      .setDepth(79);
 
-    btnZoomOut.on('pointerdown', () => {
-      this.gameScene.zoomOut();
-    });
-
-    const btnStory = this.add
-      .text(336, MAP_BOTTOM_Y - 26, '📜 HISTÓRIA', {
-        fontSize: '10px',
-        fontStyle: 'bold',
-        color: '#fef08a',
-        backgroundColor: '#14532ddd',
-        padding: { x: 6, y: 4 }
-      })
-      .setInteractive({ useHandCursor: true })
-      .setDepth(80);
-
-    btnStory.on('pointerdown', () => {
-      SoundManager.unlock();
-      SoundManager.playSelect();
-      this.createStoryModal();
-    });
-
-    const btnFullscreen = this.add
-      .text(GAME_WIDTH - 12, MAP_BOTTOM_Y - 26, this.getFullscreenLabel(), {
-        fontSize: '10px',
-        fontStyle: 'bold',
-        color: '#e4e4e7',
-        backgroundColor: '#18181bdd',
-        padding: { x: 6, y: 4 }
-      })
-      .setOrigin(1, 0)
-      .setInteractive({ useHandCursor: true })
-      .setDepth(80);
-
-    btnFullscreen.on('pointerup', (_pointer: Phaser.Input.Pointer, _lx: number, _ly: number, event: Phaser.Types.Input.EventData) => {
-      event.stopPropagation();
-      SoundManager.unlock();
-      SoundManager.playSelect();
-      this.toggleFullscreen();
-    });
-
-    const onFullscreenChange = () => {
-      if (btnFullscreen.active) {
-        btnFullscreen.setText(this.getFullscreenLabel());
-      }
+    // Armazenar posições para usar no update()
+    this.barPositions = {
+      x: barsX,
+      y1: barY1 + 6,
+      y2: barY2 + 6,
+      width: barWidth,
+      height: barHeight
     };
 
-    this.scale.on(Phaser.Scale.Events.ENTER_FULLSCREEN, onFullscreenChange);
-    this.scale.on(Phaser.Scale.Events.LEAVE_FULLSCREEN, onFullscreenChange);
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-      this.scale.off(Phaser.Scale.Events.ENTER_FULLSCREEN, onFullscreenChange);
-      this.scale.off(Phaser.Scale.Events.LEAVE_FULLSCREEN, onFullscreenChange);
-    });
+    // Texto de valores
+    this.forestValueText = this.add
+      .text(barsX + barWidth + 10, barY1 + 6, '', {
+        fontSize: '9px',
+        fontStyle: 'bold',
+        color: '#ffffff'
+      })
+      .setOrigin(0, 0.5)
+      .setDepth(80);
 
-    if (this.input.keyboard) {
-      this.input.keyboard.on('keydown-F', () => {
-        this.toggleFullscreen();
-      });
-    }
+    this.consciousnessValueText = this.add
+      .text(barsX + barWidth + 10, barY2 + 6, '', {
+        fontSize: '9px',
+        fontStyle: 'bold',
+        color: '#ffffff'
+      })
+      .setOrigin(0, 0.5)
+      .setDepth(80);
+
+    // Botões de navegação removidos
   }
 
-  private toggleFullscreen(): void {
-    toggleGameFullscreen(this.scale);
-  }
-
-  private getFullscreenLabel(): string {
-    return this.scale.isFullscreen ? '🗗 SAIR TELA CHEIA' : '⛶ TELA CHEIA';
-  }
-
+  // Menu de ações removido - método desabilitado
+  /*
   private createBottomThumbPanel(): void {
     this.add
       .rectangle(
@@ -421,6 +362,7 @@ export class UIScene extends Phaser.Scene {
     this.buildDefenseButtons();
     this.switchTab('INTEGRATED');
   }
+  */
 
   private buildIntegratedButtons(): void {
     const diff = this.gameScene.difficulty;
@@ -1654,87 +1596,33 @@ export class UIScene extends Phaser.Scene {
     const consc = this.gameScene.phaseSystem.getConsciousness();
     const phase = this.gameScene.phaseSystem.getCurrentPhase();
 
+    this.phaseTitleText.setText(`📊 ${phase.title}`);
     this.forestValueText.setText(`${Math.round(forest)}%`);
     this.consciousnessValueText.setText(`${Math.round(consc)}%`);
-    this.phaseTitleText.setText(`${phase.title}`);
 
+    // Desenhar barras de preenchimento
     this.topBarsGraphics.clear();
 
-    // Barra da Floresta (Esquerda: x=14, y=24, w=170, h=14)
-    this.topBarsGraphics.fillStyle(0x18181b, 1);
-    this.topBarsGraphics.fillRect(14, 24, 170, 14);
+    // Barra de Saúde da Floresta
     const forestColor = forest > 50 ? 0x22c55e : forest > 25 ? 0xeab308 : 0xef4444;
+    const forestFillWidth = (this.barPositions.width - 2) * (forest / 100);
     this.topBarsGraphics.fillStyle(forestColor, 1);
-    this.topBarsGraphics.fillRect(14, 24, 170 * (forest / 100), 14);
-
-    // Barra de Consciência Coletiva (Direita: x=536, y=24, w=170, h=14)
-    this.topBarsGraphics.fillStyle(0x18181b, 1);
-    this.topBarsGraphics.fillRect(536, 24, 170, 14);
-    this.topBarsGraphics.fillStyle(0x38bdf8, 1);
-    this.topBarsGraphics.fillRect(536, 24, 170 * (consc / 100), 14);
-
-    const marks = [0.2, 0.35, 0.5, 0.65];
-    this.topBarsGraphics.fillStyle(0xffffff, 0.65);
-    for (const m of marks) {
-      this.topBarsGraphics.fillRect(536 + 170 * m, 24, 1.5, 14);
-    }
-
-    const ajusteTxt = this.gameScene.phaseSystem.isAjusteFiscalActive()
-      ? '⚠️Ajuste Fiscal'
-      : '✅Verba Livre';
-    const citySmoke = this.gameScene.fireSystem.getSectorSmokeLevel(SectorType.CIDADE);
-    const forestSmoke = this.gameScene.fireSystem.getSectorSmokeLevel(SectorType.FLORESTA);
-    const maxSmoke = Math.max(citySmoke, forestSmoke);
-    const smokeTxt =
-      maxSmoke >= 2 ? `⚫Fumaça Nv.${maxSmoke} (2x Recarga)` : '💨Ar Estável';
-
-    this.statusChipsText.setText(
-      `[${this.gameScene.difficulty.label}] ${ajusteTxt} | ${smokeTxt}`
+    this.topBarsGraphics.fillRect(
+      this.barPositions.x + 1,
+      this.barPositions.y1 - this.barPositions.height / 2 + 1,
+      forestFillWidth,
+      this.barPositions.height - 2
     );
 
-    for (const [type, btn] of this.integratedButtons.entries()) {
-      if (type === IntegratedActionType.CAPTURA_PARA_CIDADE) {
-        const count = this.gameScene.sectorSystem.getCapturedQueue();
-        btn.titleText.setText(`📢 EXPOR (${count})`);
-        const ready = count > 0;
-        btn.rect.setStrokeStyle(ready ? 2.5 : 1.5, ready ? 0xfde047 : 0x52525b);
-        btn.cooldownOverlay.width = ready ? 0 : btn.width;
-      } else {
-        const ratio = this.gameScene.sectorSystem.getCooldownRemainingRatio(type);
-        btn.cooldownOverlay.width = btn.width * ratio;
-        btn.rect.setStrokeStyle(ratio <= 0 ? 2 : 1, ratio <= 0 ? 0x4ade80 : 0x52525b);
-      }
-    }
-
-    const guardaBtn = this.defenseButtons.get('RECRUIT_GUARDA');
-    if (guardaBtn) {
-      const unlocked = this.gameScene.phaseSystem.isGuardaFlorestalUnlocked();
-      const count = this.gameScene.getGuardaCount();
-      guardaBtn.titleText.setText(`🎯 GUARDA(${count}/${BALANCE.MAX_GUARDAS})`);
-      if (!unlocked) {
-        guardaBtn.subText.setText('🔒 Requer 50%');
-        guardaBtn.cooldownOverlay.width = guardaBtn.width;
-      } else if (count >= BALANCE.MAX_GUARDAS) {
-        guardaBtn.subText.setText('Limite Máx.');
-        guardaBtn.cooldownOverlay.width = guardaBtn.width;
-      } else {
-        guardaBtn.subText.setText('Emboscada/Elite');
-        const ratio = this.gameScene.getGuardaRecruitCooldownRatio();
-        guardaBtn.cooldownOverlay.width = guardaBtn.width * ratio;
-      }
-    }
-
-    const localTypes = [
-      LocalActionType.CAMPO_ACEIRO,
-      LocalActionType.CIDADE_BARREIRA_EXAUSTAO
-    ];
-    for (const lt of localTypes) {
-      const btn = this.defenseButtons.get(lt);
-      if (btn) {
-        const ratio = this.gameScene.sectorSystem.getCooldownRemainingRatio(lt);
-        btn.cooldownOverlay.width = btn.width * ratio;
-      }
-    }
+    // Barra de Consciência
+    const conscFillWidth = (this.barPositions.width - 2) * (consc / 100);
+    this.topBarsGraphics.fillStyle(0x38bdf8, 1);
+    this.topBarsGraphics.fillRect(
+      this.barPositions.x + 1,
+      this.barPositions.y2 - this.barPositions.height / 2 + 1,
+      conscFillWidth,
+      this.barPositions.height - 2
+    );
 
     const minimapNow = this.time.now;
     if (minimapNow - this.lastMinimapAt >= MINIMAP_REFRESH_MS) {

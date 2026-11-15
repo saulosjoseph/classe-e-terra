@@ -17,11 +17,11 @@ import {
 export const GAME_WIDTH = 720;
 export const GAME_HEIGHT = 405;
 
-export const HUD_TOP_HEIGHT = 54;
-export const HUD_BOTTOM_HEIGHT = 82;
+export const HUD_TOP_HEIGHT = 0; // Informações aparecem como badges
+export const HUD_BOTTOM_HEIGHT = 0; // Menu de ações removido
 export const MAP_TOP_Y = HUD_TOP_HEIGHT;
-export const MAP_BOTTOM_Y = GAME_HEIGHT - HUD_BOTTOM_HEIGHT; // 323
-export const MAP_VIEWPORT_HEIGHT = MAP_BOTTOM_Y - MAP_TOP_Y; // 269
+export const MAP_BOTTOM_Y = GAME_HEIGHT - HUD_BOTTOM_HEIGHT; // 405
+export const MAP_VIEWPORT_HEIGHT = MAP_BOTTOM_Y - MAP_TOP_Y; // 405
 
 export const WORLD_WIDTH = 11152;
 export const WORLD_HEIGHT = 8580;
