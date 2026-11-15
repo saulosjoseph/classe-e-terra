@@ -112,6 +112,8 @@ export abstract class Unit extends Phaser.Events.EventEmitter {
         return 'Trabalhador Rural';
       case UnitType.CURUPIRA:
         return 'Curupira';
+      case UnitType.MAE_DA_MATA:
+        return 'Mãe da Mata';
       default:
         return 'Unidade Popular';
     }

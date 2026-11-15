@@ -18,8 +18,9 @@ import { FireSmokeSystem } from './FireSmokeSystem';
 import { PoliticalPhaseSystem } from './PoliticalPhaseSystem';
 import { getGameClock } from './GameClock';
 
-/** Chave de recarga da invocação do Curupira, usada pelas aldeias */
+/** Chaves de recarga da invocação dos encantados, usadas pelas aldeias */
 export const CURUPIRA_COOLDOWN_KEY = 'CURUPIRA_INVOCACAO';
+export const MAE_DA_MATA_COOLDOWN_KEY = 'MAE_DA_MATA_INVOCACAO';
 
 export class SectorSystem extends Phaser.Events.EventEmitter {
   private scene: Phaser.Scene;
@@ -214,17 +215,22 @@ export class SectorSystem extends Phaser.Events.EventEmitter {
   }
 
   /**
-   * Invoca um Curupira a partir de uma aldeia. `onInvoke` cria o encantado e devolve false se não puder.
+   * Invoca um encantado a partir de uma aldeia, com recarga própria. `onInvoke` cria o encantado e devolve false se não puder.
    */
-  public executeCurupiraInvocation(village: { x: number; y: number }, onInvoke: () => boolean): boolean {
-    if (!this.isActionReady(CURUPIRA_COOLDOWN_KEY)) return false;
+  public executeEncantadoInvocation(
+    cooldownKey: string,
+    message: string,
+    village: { x: number; y: number },
+    onInvoke: () => boolean
+  ): boolean {
+    if (!this.isActionReady(cooldownKey)) return false;
     if (!onInvoke()) return false;
-    this.triggerCooldown(
-      CURUPIRA_COOLDOWN_KEY,
-      BALANCE.COOLDOWNS.LOCAL_FLORESTA_ENCANTADOS,
-      SectorType.FLORESTA
-    );
-    this.spawnFloatingText(village.x, village.y - 40, '🌿 Curupira invocado!', '#4ade80');
+    const cooldownMs =
+      cooldownKey === CURUPIRA_COOLDOWN_KEY
+        ? BALANCE.COOLDOWNS.LOCAL_FLORESTA_ENCANTADOS
+        : BALANCE.COOLDOWNS.LOCAL_MAE_DA_MATA;
+    this.triggerCooldown(cooldownKey, cooldownMs, SectorType.FLORESTA);
+    this.spawnFloatingText(village.x, village.y - 40, message, '#4ade80');
     SoundManager.playSelect();
     return true;
   }

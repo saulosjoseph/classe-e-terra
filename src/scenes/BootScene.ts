@@ -59,8 +59,13 @@ export class BootScene extends Phaser.Scene {
       frameWidth: 130,
       frameHeight: 185
     });
-    // Frames gerados por scripts/create_curupira_spritesheet.js: 0-4 caminhada, 5-7 ação, 8-10 replantio
+    // Frames gerados por scripts/create_curupira_spritesheet.js: 0-4 caminhada, 5-7 ação, 8-10 captura com laço
     this.load.spritesheet('curupira', 'assets/curupira.png', {
+      frameWidth: 160,
+      frameHeight: 160
+    });
+    // Frames gerados por scripts/create_mae_da_mata_spritesheet.js: 0-5 caminhada, 6 espalhando luz, 7 água, 8 plantando
+    this.load.spritesheet('mae_da_mata', 'assets/mae_da_mata.png', {
       frameWidth: 160,
       frameHeight: 160
     });
@@ -84,7 +89,28 @@ export class BootScene extends Phaser.Scene {
     this.createTrabalhadorRuralAnimations();
     this.createIncendiarioAnimations();
     this.createCurupiraAnimations();
+    this.createMaeDaMataAnimations();
     this.scene.start('MenuScene');
+  }
+
+  // Frames definidos em scripts/create_mae_da_mata_spritesheet.js
+  private createMaeDaMataAnimations(): void {
+    const defs: Array<{ key: string; frames: number[]; frameRate: number }> = [
+      { key: 'mae_da_mata_idle', frames: [0], frameRate: 1 },
+      { key: 'mae_da_mata_walk', frames: [0, 1, 2, 3, 4, 5], frameRate: 7 },
+      { key: 'mae_da_mata_water', frames: [7], frameRate: 1 },
+      { key: 'mae_da_mata_replant', frames: [6, 8], frameRate: 3 }
+    ];
+    for (const def of defs) {
+      if (!this.anims.exists(def.key)) {
+        this.anims.create({
+          key: def.key,
+          frames: this.anims.generateFrameNumbers('mae_da_mata', { frames: def.frames }),
+          frameRate: def.frameRate,
+          repeat: -1
+        });
+      }
+    }
   }
 
   // Frames definidos em scripts/create_curupira_spritesheet.js
@@ -93,7 +119,7 @@ export class BootScene extends Phaser.Scene {
       { key: 'curupira_idle', frames: [7], frameRate: 1 },
       { key: 'curupira_walk', frames: [0, 1, 2, 3, 4], frameRate: 8 },
       { key: 'curupira_extinguish', frames: [5, 6], frameRate: 6 },
-      { key: 'curupira_replant', frames: [8, 9, 10], frameRate: 4 }
+      { key: 'curupira_capture', frames: [8, 9, 10], frameRate: 6 }
     ];
     for (const def of defs) {
       if (!this.anims.exists(def.key)) {

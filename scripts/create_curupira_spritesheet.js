@@ -8,7 +8,7 @@ if (!inputPath) {
 const outputPath = 'public/assets/curupira.png';
 
 // Caixas [x0, y0, x1, y1] e pés [x, y] de cada frame na imagem de referência, em ordem:
-// linha 1 caminhada (0-4), linha 2 ação (5 apagando com água, 6 chutando, 7 apontando), linha 3 replantio (8-10)
+// linha 1 caminhada (0-4), linha 2 ação (5 apagando com água, 6 chutando, 7 apontando), linha 3 captura com laço (8 enrolando, 9 girando, 10 arremessando)
 const frameDefs = [
   { box: [63, 20, 174, 248], feet: [118, 242] },
   { box: [287, 20, 401, 247], feet: [344, 243] },
@@ -18,9 +18,9 @@ const frameDefs = [
   { box: [175, 262, 480, 500], feet: [240, 478] },
   { box: [540, 262, 850, 500], feet: [630, 482] },
   { box: [905, 262, 1065, 500], feet: [975, 486] },
-  { box: [230, 527, 420, 745], feet: [330, 718] },
-  { box: [455, 527, 705, 745], feet: [580, 718] },
-  { box: [715, 527, 945, 745], feet: [820, 722] }
+  { box: [265, 525, 430, 745], feet: [330, 718] },
+  { box: [495, 525, 690, 745], feet: [585, 718] },
+  { box: [715, 505, 1015, 745], feet: [800, 722] }
 ];
 
 const CELL = 160;

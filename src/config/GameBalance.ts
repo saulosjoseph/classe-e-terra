@@ -437,6 +437,7 @@ export const BALANCE = {
     LOCAL_CIDADE_EXAUSTAO: 9000,
     LOCAL_CAMPO_ACEIRO: 9500,
     LOCAL_FLORESTA_ENCANTADOS: 180000,
+    LOCAL_MAE_DA_MATA: 180000,
     SPAWN_BRIGADISTA_BASE: 120000,
     SPAWN_BOMBEIRO_BASE: 120000,
     SPAWN_GUARDA: 14000
@@ -472,18 +473,29 @@ export const BALANCE = {
     STAMINA_REGEN_PER_SEC: 1
   },
   /** Curupira, encantado invocado pelas aldeias: age sozinho e não cansa */
+  /** Máximo de encantados (Curupira e Mãe da Mata somados) em campo ao mesmo tempo */
+  ENCANTADOS_MAX_ACTIVE: 4,
   CURUPIRA: {
-    MAX_ACTIVE: 4,
     LIFETIME_MS: 60000,
     SPEED: 240,
     EXTINGUISH_POWER: 60,
     BOSS_DAMAGE_PER_SEC: 20,
+    /** Distância até o foco para apagá-lo */
+    EXTINGUISH_RANGE: 46,
+    /** Distância até o incendiário para laçá-lo e capturá-lo */
+    LASSO_RANGE: 56
+  },
+  /** Mãe da Mata, encantado invocado pelas aldeias: apaga focos com água e replanta a floresta */
+  MAE_DA_MATA: {
+    LIFETIME_MS: 60000,
+    SPEED: 200,
+    EXTINGUISH_POWER: 50,
+    /** Distância até o foco para apagá-lo */
+    EXTINGUISH_RANGE: 46,
     /** Tempo de replantio por árvore queimada restaurada */
     REPLANT_MS: 10000,
     /** Distância até a árvore queimada para começar a replantar */
-    REPLANT_RANGE: 40,
-    /** Distância até o foco para apagá-lo */
-    EXTINGUISH_RANGE: 46
+    REPLANT_RANGE: 40
   },
   /** Doação de cada casa da cidade às brigadas voluntárias */
   HOUSE_DONATION: {

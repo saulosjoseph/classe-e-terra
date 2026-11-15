@@ -914,6 +914,7 @@ export class UIScene extends Phaser.Scene {
   public showAldeiaInfoModal(village: { x: number; y: number }): void {
     if (!this.gameScene) return;
     this.gameScene.isStoryModalOpen = true;
+    const gs = this.gameScene;
 
     const modalContainer = this.add.container(0, 0).setDepth(201);
 
@@ -922,7 +923,7 @@ export class UIScene extends Phaser.Scene {
       .setInteractive();
 
     const boxW = 630;
-    const boxH = 240;
+    const boxH = 270;
     const boxX = GAME_WIDTH / 2;
     const boxY = GAME_HEIGHT / 2;
 
@@ -941,51 +942,50 @@ export class UIScene extends Phaser.Scene {
     const infoText = this.add
       .text(
         boxX,
-        boxY - 42,
-        'A aldeia guarda saberes e o território que mantém a floresta de pé. Ela pode invocar um Curupira, que age sozinho: apaga focos com mais força, não cansa e replanta a floresta.',
+        boxY - 50,
+        'A aldeia guarda saberes e o território que mantém a floresta de pé. Ela pode invocar encantados, até 4 em campo somando os dois.\n\n🌿 Curupira: age sozinho por 60 s, laça e captura incendiários e apaga focos com força.\n🌿 Mãe da Mata: age sozinha por 60 s, apaga focos com água e replanta árvores queimadas.',
         {
           fontSize: '12px',
           color: '#f4f4f5',
           align: 'center',
-          lineSpacing: 5,
+          lineSpacing: 4,
           wordWrap: { width: boxW - 60 }
         }
       )
       .setOrigin(0.5);
 
     const countText = this.add
-      .text(boxX, boxY + 4, '', { fontSize: '12px', fontStyle: 'bold', color: '#f4f4f5' })
-      .setOrigin(0.5);
-
-    const statusText = this.add
-      .text(boxX, boxY + 26, '', { fontSize: '11px', fontStyle: 'bold', color: '#86efac' })
+      .text(boxX, boxY + 22, '', { fontSize: '12px', fontStyle: 'bold', color: '#f4f4f5' })
       .setOrigin(0.5);
 
     const btnY = boxY + boxH / 2 - 32;
+    const curX = boxX - 190;
+    const maeX = boxX + 20;
 
-    const invokeBtn = this.add
-      .rectangle(boxX - 110, btnY, 260, 38, 0x14532d, 1)
-      .setStrokeStyle(2, 0x4ade80);
+    const curStatus = this.add
+      .text(curX, btnY - 28, '', { fontSize: '11px', fontStyle: 'bold', color: '#86efac' })
+      .setOrigin(0.5);
+    const maeStatus = this.add
+      .text(maeX, btnY - 28, '', { fontSize: '11px', fontStyle: 'bold', color: '#86efac' })
+      .setOrigin(0.5);
 
-    const invokeText = this.add
-      .text(boxX - 110, btnY, '🌿 Invocar Curupira', {
-        fontSize: '12px',
-        fontStyle: 'bold',
-        color: '#f0fdf4'
-      })
+    const curBtn = this.add.rectangle(curX, btnY, 200, 38, 0x14532d, 1).setStrokeStyle(2, 0x4ade80);
+    const curText = this.add
+      .text(curX, btnY, '🌿 Invocar Curupira', { fontSize: '12px', fontStyle: 'bold', color: '#f0fdf4' })
+      .setOrigin(0.5);
+
+    const maeBtn = this.add.rectangle(maeX, btnY, 200, 38, 0x134e4a, 1).setStrokeStyle(2, 0x5eead4);
+    const maeText = this.add
+      .text(maeX, btnY, '🌿 Invocar Mãe da Mata', { fontSize: '12px', fontStyle: 'bold', color: '#f0fdf4' })
       .setOrigin(0.5);
 
     const closeBtn = this.add
-      .rectangle(boxX + 150, btnY, 120, 38, 0x27272a, 1)
+      .rectangle(boxX + 230, btnY, 110, 38, 0x27272a, 1)
       .setStrokeStyle(2, 0x71717a)
       .setInteractive({ useHandCursor: true });
 
     const closeText = this.add
-      .text(boxX + 150, btnY, 'Fechar', {
-        fontSize: '12px',
-        fontStyle: 'bold',
-        color: '#f4f4f5'
-      })
+      .text(boxX + 230, btnY, 'Fechar', { fontSize: '12px', fontStyle: 'bold', color: '#f4f4f5' })
       .setOrigin(0.5);
 
     modalContainer.add([
@@ -994,39 +994,72 @@ export class UIScene extends Phaser.Scene {
       title,
       infoText,
       countText,
-      statusText,
-      invokeBtn,
-      invokeText,
+      curStatus,
+      maeStatus,
+      curBtn,
+      curText,
+      maeBtn,
+      maeText,
       closeBtn,
       closeText
     ]);
 
-    const canInvoke = (): boolean =>
-      this.gameScene.getCurupiraCount() < BALANCE.CURUPIRA.MAX_ACTIVE &&
-      this.gameScene.getCurupiraCooldownRemainingMs() <= 0;
+    const full = (): boolean => gs.getEncantadoCount() >= BALANCE.ENCANTADOS_MAX_ACTIVE;
+    const curupiraReady = (): boolean => !full() && gs.getCurupiraCooldownRemainingMs() <= 0;
+    const maeDaMataReady = (): boolean => !full() && gs.getMaeDaMataCooldownRemainingMs() <= 0;
+
+    const formatWait = (ms: number): string => {
+      const sec = Math.ceil(ms / 1000);
+      return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
+    };
+
+    const applyButton = (
+      btn: Phaser.GameObjects.Rectangle,
+      text: Phaser.GameObjects.Text,
+      status: Phaser.GameObjects.Text,
+      ready: boolean,
+      remainingMs: number,
+      readyFill: number,
+      readyStroke: number
+    ): void => {
+      let label = 'Pronto';
+      if (full()) {
+        label = 'Limite de 4 encantados';
+      } else if (remainingMs > 0) {
+        label = `Recarga: ${formatWait(remainingMs)}`;
+      }
+      status.setText(label).setColor(ready ? '#86efac' : '#fca5a5');
+      btn.setFillStyle(ready ? readyFill : 0x3f3f46, 1).setStrokeStyle(2, ready ? readyStroke : 0x71717a);
+      text.setColor(ready ? '#f0fdf4' : '#a1a1aa');
+      if (ready) {
+        btn.setInteractive({ useHandCursor: true });
+      } else {
+        btn.disableInteractive();
+      }
+    };
 
     const refresh = (): void => {
-      const count = this.gameScene.getCurupiraCount();
-      const remainingMs = this.gameScene.getCurupiraCooldownRemainingMs();
-      const ready = canInvoke();
-      countText.setText(`Curupiras em campo: ${count}/${BALANCE.CURUPIRA.MAX_ACTIVE}`);
-      const remainingSec = Math.ceil(remainingMs / 1000);
-      let label = 'Pronto para invocar';
-      if (count >= BALANCE.CURUPIRA.MAX_ACTIVE) {
-        label = 'Limite de Curupiras atingido';
-      } else if (remainingMs > 0) {
-        label = `Próxima invocação em ${Math.floor(remainingSec / 60)}:${String(remainingSec % 60).padStart(2, '0')}`;
-      }
-      statusText.setText(label).setColor(ready ? '#86efac' : '#fca5a5');
-      invokeBtn
-        .setFillStyle(ready ? 0x14532d : 0x3f3f46, 1)
-        .setStrokeStyle(2, ready ? 0x4ade80 : 0x71717a);
-      invokeText.setColor(ready ? '#f0fdf4' : '#a1a1aa');
-      if (ready) {
-        invokeBtn.setInteractive({ useHandCursor: true });
-      } else {
-        invokeBtn.disableInteractive();
-      }
+      countText.setText(
+        `Encantados em campo: ${gs.getEncantadoCount()}/${BALANCE.ENCANTADOS_MAX_ACTIVE}`
+      );
+      applyButton(
+        curBtn,
+        curText,
+        curStatus,
+        curupiraReady(),
+        gs.getCurupiraCooldownRemainingMs(),
+        0x14532d,
+        0x4ade80
+      );
+      applyButton(
+        maeBtn,
+        maeText,
+        maeStatus,
+        maeDaMataReady(),
+        gs.getMaeDaMataCooldownRemainingMs(),
+        0x134e4a,
+        0x5eead4
+      );
     };
     refresh();
     const liveTimer = this.time.addEvent({ delay: 250, loop: true, callback: refresh });
@@ -1040,9 +1073,18 @@ export class UIScene extends Phaser.Scene {
       modalContainer.destroy();
     };
 
-    invokeBtn.on('pointerup', () => {
-      if (!canInvoke()) return;
-      if (this.gameScene.invokeCurupiraFromVillage(village)) {
+    curBtn.on('pointerup', () => {
+      if (!curupiraReady()) return;
+      if (gs.invokeCurupiraFromVillage(village)) {
+        closeModal();
+      } else {
+        refresh();
+      }
+    });
+
+    maeBtn.on('pointerup', () => {
+      if (!maeDaMataReady()) return;
+      if (gs.invokeMaeDaMataFromVillage(village)) {
         closeModal();
       } else {
         refresh();

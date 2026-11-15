@@ -46,6 +46,7 @@ import { Brigadista } from '../entities/Brigadista';
 import { Bombeiro } from '../entities/Bombeiro';
 import { CarroPopular } from '../entities/CarroPopular';
 import { Curupira } from '../entities/Curupira';
+import { MaeDaMata } from '../entities/MaeDaMata';
 import { GuardaFlorestal } from '../entities/GuardaFlorestal';
 import { Incendiario } from '../entities/Incendiario';
 import { TrabalhadorRural, TrabalhadorRuralVariant } from '../entities/TrabalhadorRural';
@@ -54,7 +55,7 @@ import { CollisionSystem, getCollisionSystem, registerCollisionSystem } from '..
 import { GameClock, registerGameClock } from '../systems/GameClock';
 import { ActiveFireInstance, FireSmokeSystem, ScorchMark } from '../systems/FireSmokeSystem';
 import { PoliticalPhaseSystem } from '../systems/PoliticalPhaseSystem';
-import { CURUPIRA_COOLDOWN_KEY, SectorSystem } from '../systems/SectorSystem';
+import { CURUPIRA_COOLDOWN_KEY, MAE_DA_MATA_COOLDOWN_KEY, SectorSystem } from '../systems/SectorSystem';
 import { SpawnerSystem } from '../systems/SpawnerSystem';
 import { StaticLayerRecorder, StaticMapTiles, bakeStaticMapLayers } from '../systems/StaticMapTiles';
 import { SpeechBubble } from '../ui/SpeechBubble';
@@ -103,7 +104,7 @@ interface ForestTree {
   /** Espécie da árvore (1 a TREE_SPRITE_VARIANTS): usa o sprite saudável e o queimado de mesmo número */
   variant: number;
   burnLeftMs: number;
-  /** Marca visual do solo queimado (solo preto e fumaça), removida ao replantar */
+  /** Marca visual do solo queimado (solo preto e fumaça) */
   scorch: ScorchMark[];
 }
 
@@ -229,6 +230,7 @@ export class GameScene extends Phaser.Scene {
   private guardas: GuardaFlorestal[] = [];
   private trabalhadoresRurais: TrabalhadorRural[] = [];
   private curupiras: Curupira[] = [];
+  private maeDaMatas: MaeDaMata[] = [];
   private nextUnitId = 1;
 
   private brigadistaBaseReadyAt = 0;
@@ -311,6 +313,7 @@ export class GameScene extends Phaser.Scene {
     this.guardas = [];
     this.trabalhadoresRurais = [];
     this.curupiras = [];
+    this.maeDaMatas = [];
     this.nextUnitId = 1;
     this.brigadistaBaseReadyAt = 0;
     this.bombeiroBaseReadyAt = 0;
@@ -1938,7 +1941,8 @@ export class GameScene extends Phaser.Scene {
       ...this.bombeiros,
       ...this.guardas,
       ...this.trabalhadoresRurais,
-      ...this.curupiras
+      ...this.curupiras,
+      ...this.maeDaMatas
     ];
   }
 
@@ -1972,40 +1976,14 @@ export class GameScene extends Phaser.Scene {
     tree.scorch = this.fireSystem.createScorchMark(tree.x, tree.y);
   }
 
-  /** Restaura uma árvore queimada: remove a marca de queimada e devolve a árvore saudável */
-  private restoreTree(tree: ForestTree): void {
-    for (const obj of tree.scorch) obj.destroy();
-    tree.scorch = [];
-    tree.state = 'healthy';
-    this.applyTreeAppearance(tree);
+  /** Encantados em campo, somando Curupiras e Mães da Mata */
+  public getEncantadoCount(): number {
+    return this.curupiras.length + this.maeDaMatas.length;
   }
 
-  /** Curupira: replanta a árvore queimada em (x, y). Devolve false se ela não estiver mais queimada */
-  public replantTreeAt(x: number, y: number): boolean {
-    const tree = this.forestTrees.find((t) => t.state === 'burned' && t.x === x && t.y === y);
-    if (!tree) return false;
-    this.restoreTree(tree);
-    return true;
-  }
-
-  /** Árvore queimada mais próxima de (x, y), para o Curupira replantar */
-  public findNearestBurnedTree(x: number, y: number): { x: number; y: number } | null {
-    let nearest: ForestTree | null = null;
-    let nearestDist = Infinity;
-    for (const tree of this.forestTrees) {
-      if (tree.state !== 'burned') continue;
-      const d = getIsoDistance(x, y, tree.x, tree.y);
-      if (d < nearestDist) {
-        nearestDist = d;
-        nearest = tree;
-      }
-    }
-    return nearest;
-  }
-
-  /** Invoca um Curupira na aldeia escolhida. Devolve false se o limite de Curupiras em campo já foi atingido */
+  /** Invoca um Curupira na aldeia escolhida. Devolve false se o limite de encantados em campo já foi atingido */
   private spawnCurupira(village: { x: number; y: number }): boolean {
-    if (this.curupiras.length >= BALANCE.CURUPIRA.MAX_ACTIVE) return false;
+    if (this.getEncantadoCount() >= BALANCE.ENCANTADOS_MAX_ACTIVE) return false;
 
     const spawn = getCollisionSystem(this).snapToFree(village.x, village.y + 60);
     const curupira = new Curupira(
@@ -2022,12 +2000,72 @@ export class GameScene extends Phaser.Scene {
     return true;
   }
 
-  /** Atualiza os Curupiras e remove os que terminaram a duração em campo */
+  /** Invoca uma Mãe da Mata na aldeia escolhida. Devolve false se o limite de encantados em campo já foi atingido */
+  private spawnMaeDaMata(village: { x: number; y: number }): boolean {
+    if (this.getEncantadoCount() >= BALANCE.ENCANTADOS_MAX_ACTIVE) return false;
+
+    const spawn = getCollisionSystem(this).snapToFree(village.x, village.y + 60);
+    const maeDaMata = new MaeDaMata(
+      this,
+      `mae_da_mata_${this.nextUnitId++}`,
+      spawn.x,
+      spawn.y,
+      this.clock.now() + BALANCE.MAE_DA_MATA.LIFETIME_MS
+    );
+    this.maeDaMatas.push(maeDaMata);
+    maeDaMata.on('unit-tapped', (clicked: Unit) => {
+      this.followEntity(clicked);
+    });
+    return true;
+  }
+
+  /** Restaura uma árvore queimada: remove a marca de queimada e devolve a árvore saudável */
+  private restoreTree(tree: ForestTree): void {
+    for (const obj of tree.scorch) obj.destroy();
+    tree.scorch = [];
+    tree.state = 'healthy';
+    this.applyTreeAppearance(tree);
+  }
+
+  /** Mãe da Mata: replanta a árvore queimada em (x, y). Devolve false se ela não estiver mais queimada */
+  public replantTreeAt(x: number, y: number): boolean {
+    const tree = this.forestTrees.find((t) => t.state === 'burned' && t.x === x && t.y === y);
+    if (!tree) return false;
+    this.restoreTree(tree);
+    return true;
+  }
+
+  /** Árvore queimada mais próxima de (x, y), para a Mãe da Mata replantar */
+  public findNearestBurnedTree(x: number, y: number): { x: number; y: number } | null {
+    let nearest: ForestTree | null = null;
+    let nearestDist = Infinity;
+    for (const tree of this.forestTrees) {
+      if (tree.state !== 'burned') continue;
+      const d = getIsoDistance(x, y, tree.x, tree.y);
+      if (d < nearestDist) {
+        nearestDist = d;
+        nearest = tree;
+      }
+    }
+    return nearest;
+  }
+
+  /** Atualiza os encantados e remove os que terminaram a duração em campo */
   private updateCurupiras(deltaMs: number): void {
     const now = this.clock.now();
     for (const curupira of this.curupiras) {
       if (now >= curupira.expiresAt) continue;
-      curupira.update(deltaMs, this.fireSystem, this, this.boss);
+      curupira.update(
+        deltaMs,
+        this.fireSystem,
+        this.boss,
+        this.spawnerSystem.getArsonists(),
+        (arsonist) => this.captureArsonist(arsonist)
+      );
+    }
+    for (const maeDaMata of this.maeDaMatas) {
+      if (now >= maeDaMata.expiresAt) continue;
+      maeDaMata.update(deltaMs, this.fireSystem, this);
     }
     this.curupiras = this.curupiras.filter((curupira) => {
       if (now < curupira.expiresAt) return true;
@@ -2035,6 +2073,14 @@ export class GameScene extends Phaser.Scene {
         this.stopFollowingEntity();
       }
       curupira.destroy();
+      return false;
+    });
+    this.maeDaMatas = this.maeDaMatas.filter((maeDaMata) => {
+      if (now < maeDaMata.expiresAt) return true;
+      if (this.getFollowedEntity() === maeDaMata) {
+        this.stopFollowingEntity();
+      }
+      maeDaMata.destroy();
       return false;
     });
   }
@@ -2056,15 +2102,29 @@ export class GameScene extends Phaser.Scene {
 
   /** Invocação feita pela aldeia clicada (ver o modal da aldeia na UIScene) */
   public invokeCurupiraFromVillage(village: { x: number; y: number }): boolean {
-    return this.sectorSystem.executeCurupiraInvocation(village, () => this.spawnCurupira(village));
+    return this.sectorSystem.executeEncantadoInvocation(
+      CURUPIRA_COOLDOWN_KEY,
+      '🌿 Curupira invocado!',
+      village,
+      () => this.spawnCurupira(village)
+    );
   }
 
-  public getCurupiraCount(): number {
-    return this.curupiras.length;
+  public invokeMaeDaMataFromVillage(village: { x: number; y: number }): boolean {
+    return this.sectorSystem.executeEncantadoInvocation(
+      MAE_DA_MATA_COOLDOWN_KEY,
+      '🌿 Mãe da Mata invocada!',
+      village,
+      () => this.spawnMaeDaMata(village)
+    );
   }
 
   public getCurupiraCooldownRemainingMs(): number {
     return this.sectorSystem.getCooldownRemainingMs(CURUPIRA_COOLDOWN_KEY);
+  }
+
+  public getMaeDaMataCooldownRemainingMs(): number {
+    return this.sectorSystem.getCooldownRemainingMs(MAE_DA_MATA_COOLDOWN_KEY);
   }
 
   public triggerLocalAction(type: LocalActionType): boolean {

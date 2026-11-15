@@ -29,14 +29,22 @@ A tela apresenta uma visão isométrica ou superior de Santarém, dividida em tr
 * **Função:** Combate direto na linha de frente, regeneração e ancestralidade.
 * **Ações:** Plantio de sementes e o Chamado aos Encantados. O mapa tem quatro aldeias indígenas, uma em cada vértice da Floresta (topo, direita, base e esquerda).
 
-### 🌿 Os Encantados: O Curupira (Renovação da Floresta)
-* **Quem invoca:** As aldeias indígenas. Ao tocar em uma aldeia, abre-se a opção "Invocar Curupira", e o Curupira nasce nessa aldeia.
-* **Recarga:** 3 minutos. Até 4 Curupiras podem estar em campo ao mesmo tempo.
+### 🌿 Os Encantados (Renovação da Floresta)
+* **Quem invoca:** As aldeias indígenas. Ao tocar em uma aldeia, abre-se a opção "Invocar Curupira" ou "Invocar Mãe da Mata", e o encantado nasce nessa aldeia.
+* **Limite:** No máximo 4 encantados em campo ao mesmo tempo, somando Curupiras e Mães da Mata.
+* **Recarga:** 3 minutos para cada tipo de encantado, separadamente.
 * **Duração:** 60 segundos. Depois disso, ele deixa a partida.
-* **Comportamento:** Age sozinho. Prioridades: (1) apagar o foco mais próximo; (2) sem focos, atacar a Fortaleza do Burguês, se estiver ativa; (3) sem focos nem Burguês, replantar a árvore queimada mais próxima.
-* **Replantio:** Uma árvore queimada volta a ser saudável a cada 10 segundos de trabalho do Curupira.
+
+#### O Curupira
+* **Comportamento:** Age sozinho. Prioridades: (1) laçar e capturar o incendiário mais próximo, a até 56 px; (2) apagar o foco mais próximo; (3) sem focos, atacar a Fortaleza do Burguês, se estiver ativa; (4) sem nada disso, fica parado na aldeia.
+* **Captura:** Cada incendiário capturado segue a regra de captura do Guarda Florestal e alimenta a ação Captura ➔ Cidade.
+* **Não recupera a floresta:** O Curupira não replanta árvores nem restaura a saúde da floresta.
 * **Atributos:** Mesmas regras das demais unidades (fumaça desacelera, pode ser acompanhado pela câmera), mas mais forte: velocidade 240, força de extinção 60 e 20 de dano por segundo ao Burguês. Não cansa: a energia nunca diminui.
-* **Substitui:** O antigo reflorestamento ativo (+12% de saúde).
+
+#### A Mãe da Mata
+* **Comportamento:** Age sozinha. Prioridades: (1) apagar o foco mais próximo, jogando água; (2) sem focos, replantar a árvore queimada mais próxima, com 1 árvore a cada 10 segundos de trabalho.
+* **Recuperação:** Cada árvore replantada volta a ser saudável e restaura a saúde da floresta.
+* **Atributos:** Mesmas regras das demais unidades (fumaça desacelera, pode ser acompanhada pela câmera). Velocidade 200 e força de extinção 50. Não cansa: a energia nunca diminui.
 
 ## 3. As Classes Especiais de Combate (Desbloqueáveis)
 
@@ -90,7 +98,7 @@ Para evoluir a barra de **Consciência Coletiva (0% a 100%)**, o jogador precisa
 Cada setor tem uma ação própria, que não gera Consciência:
 * **Cidade ➔ Barreira de Exaustão (9 s):** Reduz para 65% (mínimo 10) a intensidade dos focos da Cidade e do Campo, e de qualquer foco com fumaça de nível 2 ou mais. Não apaga focos.
 * **Campo ➔ Anel de Aceiro (9,5 s):** Cria por 16 s um anel de aceiro na divisa entre Campo e Floresta, que impede a criação de focos ali.
-* **Floresta ➔ Chamado aos Encantados (3 min):** Ao tocar em uma aldeia, invoca um Curupira nela. Substitui o antigo reflorestamento.
+* **Floresta ➔ Chamado aos Encantados (3 min):** Ao tocar em uma aldeia, invoca um Curupira ou uma Mãe da Mata nela.
 
 ### Doações de Casas
 * Cada casa da Cidade pode doar às brigadas: +0,5% de Consciência e +25% de energia para os brigadistas.
