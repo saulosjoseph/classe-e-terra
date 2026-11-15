@@ -75,7 +75,9 @@ const config: Phaser.Types.Core.GameConfig = {
     antialias: true,
     pixelArt: false,
     roundPixels: true,
-    desynchronized: true
+    desynchronized: false,
+    maxLights: 10,
+    batchSize: 4096
   },
   scale: {
     mode: Phaser.Scale.FIT,
@@ -83,7 +85,8 @@ const config: Phaser.Types.Core.GameConfig = {
     fullscreenTarget: 'game-container'
   },
   input: {
-    activePointers: 2
+    activePointers: 2,
+    queue: true
   },
   fps: {
     target: 60,

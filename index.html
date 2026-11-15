@@ -28,6 +28,7 @@
         font-family: Roboto, system-ui, sans-serif;
         touch-action: none;
         overscroll-behavior: none;
+        image-rendering: -webkit-optimize-contrast;
       }
       #game-container {
         width: 100vw;
@@ -41,6 +42,12 @@
         display: block;
         touch-action: none;
         box-shadow: 0 0 24px rgba(0, 0, 0, 0.85);
+        image-rendering: auto;
+        image-rendering: crisp-edges;
+        -webkit-filter: blur(0px);
+        backface-visibility: hidden;
+        -webkit-backface-visibility: hidden;
+        will-change: transform;
       }
       #rotate-hint {
         display: none;

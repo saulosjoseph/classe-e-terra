@@ -8,6 +8,15 @@ export default defineConfig({
   },
   build: {
     target: 'es2020',
-    assetsInlineLimit: 0
+    assetsInlineLimit: 0,
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        passes: 2
+      }
+    }
+  },
+  optimizeDeps: {
+    include: ['phaser']
   }
 });
