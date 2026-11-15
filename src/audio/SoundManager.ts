@@ -1,12 +1,53 @@
+import Phaser from 'phaser';
+
 /**
  * Gerenciador de Áudio 8-bit procedural via Web Audio API.
  * Otimizado para dispositivos móveis: desbloqueia automaticamente no primeiro toque.
+ * Suporta também áudio em formato MP3 via Phaser.
  */
 class SoundManagerImpl {
   private ctx: AudioContext | null = null;
   private muted = false;
   private bgmInterval: number | null = null;
   private step = 0;
+  private scene: Phaser.Scene | null = null;
+  private currentBGM: Phaser.Sound.BaseSound | null = null;
+
+  public setScene(scene: Phaser.Scene): void {
+    this.scene = scene;
+  }
+
+  public playBGMForPhase(phaseId: number): void {
+    if (this.muted || !this.scene || !this.scene.sound) return;
+
+    this.stopBGM();
+
+    const audioKey = this.getAudioKeyForPhase(phaseId);
+    if (!audioKey) return;
+
+    try {
+      this.scene.sound.unlock();
+      this.currentBGM = this.scene.sound.add(audioKey, { loop: true, volume: 0.6 });
+      this.currentBGM.play();
+    } catch {
+      this.startMusic();
+    }
+  }
+
+  private getAudioKeyForPhase(phaseId: number): string | null {
+    const phaseAudioMap: { [key: number]: string } = {
+      1: 'bgm_fase_1',
+    };
+    return phaseAudioMap[phaseId] || null;
+  }
+
+  public stopBGM(): void {
+    if (this.currentBGM) {
+      this.currentBGM.stop();
+      this.currentBGM = null;
+    }
+    this.stopMusic();
+  }
 
   public unlock(): void {
     try {

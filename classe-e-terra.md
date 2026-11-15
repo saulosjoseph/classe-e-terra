@@ -29,10 +29,14 @@ A tela apresenta uma visão isométrica ou superior de Santarém, dividida em tr
 * **Função:** Combate direto na linha de frente, regeneração e ancestralidade.
 * **Ações:** Plantio de sementes e o Chamado aos Encantados. O mapa tem quatro aldeias indígenas, uma em cada vértice da Floresta (topo, direita, base e esquerda).
 
-### 🌿 Os Encantados (Renovação da Floresta)
-* **Quem invoca:** As aldeias indígenas.
-* **Efeito:** Os encantados renovam a floresta. Substituem o reflorestamento ativo como ação da Floresta.
-* **Em definição:** A forma exata da renovação, o custo, a recarga e a quantidade de encantados por invocação.
+### 🌿 Os Encantados: O Curupira (Renovação da Floresta)
+* **Quem invoca:** As aldeias indígenas. Ao tocar em uma aldeia, abre-se a opção "Invocar Curupira", e o Curupira nasce nessa aldeia.
+* **Recarga:** 3 minutos. Até 4 Curupiras podem estar em campo ao mesmo tempo.
+* **Duração:** 60 segundos. Depois disso, ele deixa a partida.
+* **Comportamento:** Age sozinho. Prioridades: (1) apagar o foco mais próximo; (2) sem focos, atacar a Fortaleza do Burguês, se estiver ativa; (3) sem focos nem Burguês, replantar a árvore queimada mais próxima.
+* **Replantio:** Uma árvore queimada volta a ser saudável a cada 10 segundos de trabalho do Curupira.
+* **Atributos:** Mesmas regras das demais unidades (fumaça desacelera, pode ser acompanhado pela câmera), mas mais forte: velocidade 240, força de extinção 60 e 20 de dano por segundo ao Burguês. Não cansa: a energia nunca diminui.
+* **Substitui:** O antigo reflorestamento ativo (+12% de saúde).
 
 ## 3. As Classes Especiais de Combate (Desbloqueáveis)
 
@@ -86,7 +90,7 @@ Para evoluir a barra de **Consciência Coletiva (0% a 100%)**, o jogador precisa
 Cada setor tem uma ação própria, que não gera Consciência:
 * **Cidade ➔ Barreira de Exaustão (9 s):** Reduz para 65% (mínimo 10) a intensidade dos focos da Cidade e do Campo, e de qualquer foco com fumaça de nível 2 ou mais. Não apaga focos.
 * **Campo ➔ Anel de Aceiro (9,5 s):** Cria por 16 s um anel de aceiro na divisa entre Campo e Floresta, que impede a criação de focos ali.
-* **Floresta ➔ Chamado aos Encantados (em definição):** As aldeias invocam encantados que renovam a floresta. Substitui o antigo reflorestamento.
+* **Floresta ➔ Chamado aos Encantados (3 min):** Ao tocar em uma aldeia, invoca um Curupira nela. Substitui o antigo reflorestamento.
 
 ### Doações de Casas
 * Cada casa da Cidade pode doar às brigadas: +0,5% de Consciência e +25% de energia para os brigadistas.

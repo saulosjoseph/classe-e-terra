@@ -54,7 +54,7 @@ import { CollisionSystem, getCollisionSystem, registerCollisionSystem } from '..
 import { GameClock, registerGameClock } from '../systems/GameClock';
 import { ActiveFireInstance, FireSmokeSystem, ScorchMark } from '../systems/FireSmokeSystem';
 import { PoliticalPhaseSystem } from '../systems/PoliticalPhaseSystem';
-import { SectorSystem } from '../systems/SectorSystem';
+import { CURUPIRA_COOLDOWN_KEY, SectorSystem } from '../systems/SectorSystem';
 import { SpawnerSystem } from '../systems/SpawnerSystem';
 import { StaticLayerRecorder, StaticMapTiles, bakeStaticMapLayers } from '../systems/StaticMapTiles';
 import { SpeechBubble } from '../ui/SpeechBubble';
@@ -342,7 +342,8 @@ export class GameScene extends Phaser.Scene {
   public create(): void {
     registerGameClock(this, this.clock);
     this.matchStartTime = this.clock.now();
-    SoundManager.startMusic();
+    SoundManager.setScene(this);
+    SoundManager.unlock();
 
     this.setupScrollableCamera();
     registerCollisionSystem(this, new CollisionSystem());
@@ -408,6 +409,9 @@ export class GameScene extends Phaser.Scene {
     this.centerCameraOnPoint(1864, 3994.5, false);
 
     this.registerEvents();
+
+    // Inicia a trilha sonora da Fase 1
+    SoundManager.playBGMForPhase(this.phaseSystem.getCurrentPhase().id);
 
     // Inicia HUD Mobile-First em cena paralela
     this.scene.launch('UIScene', { gameScene: this });
@@ -1421,7 +1425,7 @@ export class GameScene extends Phaser.Scene {
       aldeiaSprite.on('pointerup', (pointer: Phaser.Input.Pointer) => {
         // Arrastar o mapa não conta como toque na aldeia
         if (pointer.getDistance() > 10) return;
-        this.onAldeiaClicked();
+        this.onAldeiaClicked(pos);
       });
       getCollisionSystem(this).addObstacle(pos.x, pos.y, COLLISION.ALDEIA_RADIUS);
     }
@@ -1656,6 +1660,9 @@ export class GameScene extends Phaser.Scene {
   }
 
   private handlePhaseMilestone(phase: PoliticalPhaseDefinition): void {
+    // Muda a trilha sonora ao avançar de fase
+    SoundManager.playBGMForPhase(phase.id);
+
     // Fase 2 (20%): Evolui a Brigada Voluntária isolada para Brigada Comunitária e adiciona +1 esquadrão na Cidade!
     if (phase.id >= PoliticalPhaseId.FASE_2_SEMENTE_ORGANIZACAO) {
       this.brigadistas.forEach((b) => b.evolveToComunitario());
@@ -1824,13 +1831,13 @@ export class GameScene extends Phaser.Scene {
     this.events.emit('bombeiros-base-clicked');
   }
 
-  private onAldeiaClicked(): void {
+  private onAldeiaClicked(village: { x: number; y: number }): void {
     if (this.isEnding || this.isStoryModalOpen) return;
     SoundManager.unlock();
     SoundManager.playSelect();
     this.clearHouseFocus();
     this.clearPrefeituraFocus();
-    this.events.emit('aldeia-clicked');
+    this.events.emit('aldeia-clicked', village);
   }
 
   public getBombeiroCount(): number {
@@ -1996,28 +2003,9 @@ export class GameScene extends Phaser.Scene {
     return nearest;
   }
 
-  /**
-   * Chamado pelas aldeias: invoca um Curupira na aldeia mais próxima do foco mais intenso.
-   * Devolve a posição da aldeia, ou null se o limite de Curupiras em campo já foi atingido.
-   */
-  private invokeCurupira(): { x: number; y: number } | null {
-    if (this.curupiras.length >= BALANCE.CURUPIRA.MAX_ACTIVE) return null;
-
-    const intensest = this.fireSystem
-      .getActiveFires()
-      .reduce<ActiveFireInstance | null>(
-        (best, fire) => (!best || fire.data.intensity > best.data.intensity ? fire : best),
-        null
-      );
-    let village = ALDEIA_POSITIONS[Math.floor(Math.random() * ALDEIA_POSITIONS.length)];
-    if (intensest) {
-      village = ALDEIA_POSITIONS.reduce((best, v) =>
-        getIsoDistance(v.x, v.y, intensest.data.x, intensest.data.y) <
-        getIsoDistance(best.x, best.y, intensest.data.x, intensest.data.y)
-          ? v
-          : best
-      );
-    }
+  /** Invoca um Curupira na aldeia escolhida. Devolve false se o limite de Curupiras em campo já foi atingido */
+  private spawnCurupira(village: { x: number; y: number }): boolean {
+    if (this.curupiras.length >= BALANCE.CURUPIRA.MAX_ACTIVE) return false;
 
     const spawn = getCollisionSystem(this).snapToFree(village.x, village.y + 60);
     const curupira = new Curupira(
@@ -2031,7 +2019,7 @@ export class GameScene extends Phaser.Scene {
     curupira.on('unit-tapped', (clicked: Unit) => {
       this.followEntity(clicked);
     });
-    return { x: village.x, y: village.y };
+    return true;
   }
 
   /** Atualiza os Curupiras e remove os que terminaram a duração em campo */
@@ -2066,8 +2054,21 @@ export class GameScene extends Phaser.Scene {
     );
   }
 
+  /** Invocação feita pela aldeia clicada (ver o modal da aldeia na UIScene) */
+  public invokeCurupiraFromVillage(village: { x: number; y: number }): boolean {
+    return this.sectorSystem.executeCurupiraInvocation(village, () => this.spawnCurupira(village));
+  }
+
+  public getCurupiraCount(): number {
+    return this.curupiras.length;
+  }
+
+  public getCurupiraCooldownRemainingMs(): number {
+    return this.sectorSystem.getCooldownRemainingMs(CURUPIRA_COOLDOWN_KEY);
+  }
+
   public triggerLocalAction(type: LocalActionType): boolean {
-    return this.sectorSystem.executeLocalAction(type, () => this.invokeCurupira());
+    return this.sectorSystem.executeLocalAction(type);
   }
 
   private captureArsonist(arsonist: Incendiario): void {

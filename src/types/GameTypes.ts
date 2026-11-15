@@ -37,8 +37,7 @@ export enum IntegratedActionType {
 
 export enum LocalActionType {
   CIDADE_BARREIRA_EXAUSTAO = 'CIDADE_BARREIRA_EXAUSTAO',
-  CAMPO_ACEIRO = 'CAMPO_ACEIRO',
-  FLORESTA_CHAMADO_ENCANTADOS = 'FLORESTA_CHAMADO_ENCANTADOS'
+  CAMPO_ACEIRO = 'CAMPO_ACEIRO'
 }
 
 export interface DifficultyConfig {

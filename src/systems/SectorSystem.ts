@@ -18,6 +18,9 @@ import { FireSmokeSystem } from './FireSmokeSystem';
 import { PoliticalPhaseSystem } from './PoliticalPhaseSystem';
 import { getGameClock } from './GameClock';
 
+/** Chave de recarga da invocação do Curupira, usada pelas aldeias */
+export const CURUPIRA_COOLDOWN_KEY = 'CURUPIRA_INVOCACAO';
+
 export class SectorSystem extends Phaser.Events.EventEmitter {
   private scene: Phaser.Scene;
   private difficulty: DifficultyConfig;
@@ -174,13 +177,9 @@ export class SectorSystem extends Phaser.Events.EventEmitter {
   }
 
   /**
-   * Executa Ações Setoriais Locais (Cidade: Exaustão | Campo: Aceiros | Floresta: Chamado aos Encantados).
-   * `onInvokeCurupira` devolve a posição da aldeia que invocou, ou null se a invocação não puder acontecer.
+   * Executa Ações Setoriais Locais (Cidade: Exaustão | Campo: Aceiros).
    */
-  public executeLocalAction(
-    type: LocalActionType,
-    onInvokeCurupira: () => { x: number; y: number } | null
-  ): boolean {
+  public executeLocalAction(type: LocalActionType): boolean {
     if (!this.isActionReady(type)) return false;
 
     switch (type) {
@@ -208,18 +207,31 @@ export class SectorSystem extends Phaser.Events.EventEmitter {
         );
         break;
       }
-
-      case LocalActionType.FLORESTA_CHAMADO_ENCANTADOS: {
-        const village = onInvokeCurupira();
-        if (!village) return false;
-        this.triggerCooldown(type, BALANCE.COOLDOWNS.LOCAL_FLORESTA_ENCANTADOS, SectorType.FLORESTA);
-        this.spawnFloatingText(village.x, village.y - 40, '🌿 Curupira invocado!', '#4ade80');
-        break;
-      }
     }
 
     SoundManager.playSelect();
     return true;
+  }
+
+  /**
+   * Invoca um Curupira a partir de uma aldeia. `onInvoke` cria o encantado e devolve false se não puder.
+   */
+  public executeCurupiraInvocation(village: { x: number; y: number }, onInvoke: () => boolean): boolean {
+    if (!this.isActionReady(CURUPIRA_COOLDOWN_KEY)) return false;
+    if (!onInvoke()) return false;
+    this.triggerCooldown(
+      CURUPIRA_COOLDOWN_KEY,
+      BALANCE.COOLDOWNS.LOCAL_FLORESTA_ENCANTADOS,
+      SectorType.FLORESTA
+    );
+    this.spawnFloatingText(village.x, village.y - 40, '🌿 Curupira invocado!', '#4ade80');
+    SoundManager.playSelect();
+    return true;
+  }
+
+  public getCooldownRemainingMs(actionKey: string): number {
+    const end = this.cooldownEnds.get(actionKey) ?? 0;
+    return Math.max(0, end - getGameClock(this.scene).now());
   }
 
   private spawnRouteEffect(from: SectorType, to: SectorType, colorHex: number, badgeText: string): void {

@@ -519,15 +519,6 @@ export class UIScene extends Phaser.Scene {
         color: 0x1e3a8a,
         onClick: () =>
           this.gameScene.triggerLocalAction(LocalActionType.CIDADE_BARREIRA_EXAUSTAO)
-      },
-      {
-        key: LocalActionType.FLORESTA_CHAMADO_ENCANTADOS,
-        x: 540,
-        title: '🌿 ENCANTADOS',
-        sub: 'Curupira (3 min)',
-        color: 0x14532d,
-        onClick: () =>
-          this.gameScene.triggerLocalAction(LocalActionType.FLORESTA_CHAMADO_ENCANTADOS)
       }
     ];
 
@@ -920,11 +911,145 @@ export class UIScene extends Phaser.Scene {
     );
   }
 
-  public showAldeiaInfoModal(): void {
-    this.openInfoModal(
-      'Aldeia',
-      'A aldeia guarda saberes e o território que mantém a floresta de pé. Proteger seus territórios é proteger a própria floresta.'
-    );
+  public showAldeiaInfoModal(village: { x: number; y: number }): void {
+    if (!this.gameScene) return;
+    this.gameScene.isStoryModalOpen = true;
+
+    const modalContainer = this.add.container(0, 0).setDepth(201);
+
+    const backdrop = this.add
+      .rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.82)
+      .setInteractive();
+
+    const boxW = 630;
+    const boxH = 240;
+    const boxX = GAME_WIDTH / 2;
+    const boxY = GAME_HEIGHT / 2;
+
+    const boxBg = this.add
+      .rectangle(boxX, boxY, boxW, boxH, 0x090d0a, 0.98)
+      .setStrokeStyle(2.5, 0x4ade80);
+
+    const title = this.add
+      .text(boxX, boxY - boxH / 2 + 28, 'ALDEIA', {
+        fontSize: '13px',
+        fontStyle: 'bold',
+        color: '#86efac'
+      })
+      .setOrigin(0.5);
+
+    const infoText = this.add
+      .text(
+        boxX,
+        boxY - 42,
+        'A aldeia guarda saberes e o território que mantém a floresta de pé. Ela pode invocar um Curupira, que age sozinho: apaga focos com mais força, não cansa e replanta a floresta.',
+        {
+          fontSize: '12px',
+          color: '#f4f4f5',
+          align: 'center',
+          lineSpacing: 5,
+          wordWrap: { width: boxW - 60 }
+        }
+      )
+      .setOrigin(0.5);
+
+    const countText = this.add
+      .text(boxX, boxY + 4, '', { fontSize: '12px', fontStyle: 'bold', color: '#f4f4f5' })
+      .setOrigin(0.5);
+
+    const statusText = this.add
+      .text(boxX, boxY + 26, '', { fontSize: '11px', fontStyle: 'bold', color: '#86efac' })
+      .setOrigin(0.5);
+
+    const btnY = boxY + boxH / 2 - 32;
+
+    const invokeBtn = this.add
+      .rectangle(boxX - 110, btnY, 260, 38, 0x14532d, 1)
+      .setStrokeStyle(2, 0x4ade80);
+
+    const invokeText = this.add
+      .text(boxX - 110, btnY, '🌿 Invocar Curupira', {
+        fontSize: '12px',
+        fontStyle: 'bold',
+        color: '#f0fdf4'
+      })
+      .setOrigin(0.5);
+
+    const closeBtn = this.add
+      .rectangle(boxX + 150, btnY, 120, 38, 0x27272a, 1)
+      .setStrokeStyle(2, 0x71717a)
+      .setInteractive({ useHandCursor: true });
+
+    const closeText = this.add
+      .text(boxX + 150, btnY, 'Fechar', {
+        fontSize: '12px',
+        fontStyle: 'bold',
+        color: '#f4f4f5'
+      })
+      .setOrigin(0.5);
+
+    modalContainer.add([
+      backdrop,
+      boxBg,
+      title,
+      infoText,
+      countText,
+      statusText,
+      invokeBtn,
+      invokeText,
+      closeBtn,
+      closeText
+    ]);
+
+    const canInvoke = (): boolean =>
+      this.gameScene.getCurupiraCount() < BALANCE.CURUPIRA.MAX_ACTIVE &&
+      this.gameScene.getCurupiraCooldownRemainingMs() <= 0;
+
+    const refresh = (): void => {
+      const count = this.gameScene.getCurupiraCount();
+      const remainingMs = this.gameScene.getCurupiraCooldownRemainingMs();
+      const ready = canInvoke();
+      countText.setText(`Curupiras em campo: ${count}/${BALANCE.CURUPIRA.MAX_ACTIVE}`);
+      const remainingSec = Math.ceil(remainingMs / 1000);
+      let label = 'Pronto para invocar';
+      if (count >= BALANCE.CURUPIRA.MAX_ACTIVE) {
+        label = 'Limite de Curupiras atingido';
+      } else if (remainingMs > 0) {
+        label = `Próxima invocação em ${Math.floor(remainingSec / 60)}:${String(remainingSec % 60).padStart(2, '0')}`;
+      }
+      statusText.setText(label).setColor(ready ? '#86efac' : '#fca5a5');
+      invokeBtn
+        .setFillStyle(ready ? 0x14532d : 0x3f3f46, 1)
+        .setStrokeStyle(2, ready ? 0x4ade80 : 0x71717a);
+      invokeText.setColor(ready ? '#f0fdf4' : '#a1a1aa');
+      if (ready) {
+        invokeBtn.setInteractive({ useHandCursor: true });
+      } else {
+        invokeBtn.disableInteractive();
+      }
+    };
+    refresh();
+    const liveTimer = this.time.addEvent({ delay: 250, loop: true, callback: refresh });
+
+    const closeModal = () => {
+      SoundManager.unlock();
+      liveTimer.remove();
+      if (this.gameScene) {
+        this.gameScene.isStoryModalOpen = false;
+      }
+      modalContainer.destroy();
+    };
+
+    invokeBtn.on('pointerup', () => {
+      if (!canInvoke()) return;
+      if (this.gameScene.invokeCurupiraFromVillage(village)) {
+        closeModal();
+      } else {
+        refresh();
+      }
+    });
+
+    closeBtn.on('pointerup', closeModal);
   }
 
   public showBombeirosBaseModal(): void {
@@ -1559,8 +1684,7 @@ export class UIScene extends Phaser.Scene {
 
     const localTypes = [
       LocalActionType.CAMPO_ACEIRO,
-      LocalActionType.CIDADE_BARREIRA_EXAUSTAO,
-      LocalActionType.FLORESTA_CHAMADO_ENCANTADOS
+      LocalActionType.CIDADE_BARREIRA_EXAUSTAO
     ];
     for (const lt of localTypes) {
       const btn = this.defenseButtons.get(lt);

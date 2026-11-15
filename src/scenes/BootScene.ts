@@ -72,6 +72,9 @@ export class BootScene extends Phaser.Scene {
     this.load.image('carro_popular_amarelo', 'assets/carro_popular_amarelo.png');
     this.load.image('carro_popular_preto', 'assets/carro_popular_preto.png');
     this.load.image('carro_popular_prata', 'assets/carro_popular_prata.png');
+
+    // Áudio - Trilhas sonoras das fases
+    this.load.audio('bgm_fase_1', 'assets/o_peso_da_terra.mp3');
   }
 
   public create(): void {
