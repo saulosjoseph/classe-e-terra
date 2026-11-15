@@ -85,8 +85,7 @@ const config: Phaser.Types.Core.GameConfig = {
     fullscreenTarget: 'game-container'
   },
   input: {
-    activePointers: 2,
-    queue: true
+    activePointers: 2
   },
   fps: {
     target: 60,
