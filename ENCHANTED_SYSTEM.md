@@ -137,14 +137,14 @@ return this.sectorSystem.getEncantadoCooldownRemainingMs(villageIndex, 'curupira
 - **Atributo**: `villageIndex: number` (qual aldeia invocou)
 - **Duração**: 60 segundos
 - **Cooldown**: 1 minuto e 20 segundos (80 segundos) por aldeia
-- **Limite por aldeia**: 1 por vez
+- **Limite por aldeia**: Máximo 1 encantado por vez (qualquer tipo)
 
 ### Mãe da Mata
 - **Classe**: `src/entities/MaeDaMata.ts`
 - **Atributo**: `villageIndex: number` (qual aldeia invocou)
 - **Duração**: 60 segundos
 - **Cooldown**: 1 minuto e 20 segundos (80 segundos) por aldeia
-- **Limite por aldeia**: 1 por vez
+- **Limite por aldeia**: Máximo 1 encantado por vez (qualquer tipo)
 
 ## Exemplos de Cenários
 
@@ -153,18 +153,37 @@ return this.sectorSystem.getEncantadoCooldownRemainingMs(villageIndex, 'curupira
 ```
 T=0s: Invoca Curupira na aldeia 0
       - CURUPIRA_VILLAGE_0 = cooldown até T=80s
+      - Aldeia 0 está ocupada por Curupira
 
 T=5s: Invoca Curupira na aldeia 1
       - CURUPIRA_VILLAGE_1 = cooldown até T=85s
-      (aldeias 0 e 1 têm cooldowns independentes)
+      (aldeias 0 e 1 têm cooldowns e encantados independentes)
 
 T=60s: Curupira da aldeia 0 expira
        - Aldeia 0 fica livre para novo encantado
        - CURUPIRA_VILLAGE_0 ainda em cooldown até T=80s
-       (não pode invocar Curupira, mas pode invocar Mãe da Mata!)
+       - MAE_DA_MATA_VILLAGE_0 está pronto para invocar!
 ```
 
-### Cenário 2: Limite global é respeitado
+### Cenário 2: Um encantado por aldeia (novo!)
+
+```
+T=0s: Invoca Curupira na aldeia 0
+      - Aldeia 0 está ocupada
+
+T=5s: Tenta invocar Mãe da Mata na aldeia 0
+      → FALHA: Já existe Curupira nessa aldeia
+      → Mensagem: "Já existe um encantado nesta aldeia"
+
+T=60s: Curupira da aldeia 0 expira
+       - Aldeia 0 fica livre
+       - MAE_DA_MATA_VILLAGE_0 está pronto
+
+T=65s: Invoca Mãe da Mata na aldeia 0 ✓
+       - MAE_DA_MATA_VILLAGE_0 = cooldown até T=145s
+```
+
+### Cenário 3: Limite global é respeitado
 
 ```
 T=0s: Invoca Curupira na aldeia 0 (total: 1)
@@ -173,24 +192,6 @@ T=10s: Invoca Mãe da Mata na aldeia 2 (total: 3)
 T=15s: Invoca Mãe da Mata na aldeia 3 (total: 4)
 T=20s: Tenta invocar novo encantado
        → FALHA: Limite global de 4 atingido
-       → Mensagem: "Limite de 4 encantados"
-```
-
-### Cenário 3: Um encantado por aldeia por vez
-
-```
-T=0s: Invoca Curupira na aldeia 0 ✓
-      - villageIndex=0, villageIndex em uso para Curupira
-
-T=5s: Tenta invocar Mãe da Mata na aldeia 0
-      → Verifica hasEncantadoFromVillage(0, 'mae_da_mata')
-      → Retorna true (porque há qualquer encantado?)
-      → FALHA: Já existe encantado dessa aldeia
-      
-Obs: Atualmente verifica por tipo específico!
-     Então pode invocar Mãe da Mata se tiver Curupira.
-     Mas NÃO pode invocar 2 Curupiras na mesma aldeia.
-```
 
 ## Como Testar
 
@@ -201,12 +202,18 @@ Obs: Atualmente verifica por tipo específico!
 4. **Esperado**: Botão está habilitado e você consegue invocar (cooldowns independentes)
 
 ### Teste 2: Limite por aldeia
+### Teste 2: Um encantado por aldeia
+1. Clique na aldeia 0, invoque Curupira
+2. Na mesma aldeia 0, tente invocar Mãe da Mata
+3. **Esperado**: Botão desabilitado ou mensagem de erro (já existe um encantado nessa aldeia)
+
+### Teste 3: Cooldown específico por tipo
 1. Clique na aldeia 0, invoque Curupira
 2. Aguarde 60 segundos (Curupira expira)
-3. Na mesma aldeia 0, invoque Curupira novamente, dentro de 1m20s
-4. **Esperado**: Cooldown mostra "Recarga: 1:XX" mas você pode invocar assim que expira o encantado anterior
+3. Imediatamente invoque Mãe da Mata na aldeia 0
+4. **Esperado**: Sucesso! Mãe da Mata é invocada (cooldown de Curupira não afeta Mãe da Mata)
 
-### Teste 3: Limite global
+### Teste 4: Limite global
 1. Invoque encantados em todas as 4 aldeias até ter 4 em campo
 2. Tente invocar um 5º encantado
 3. **Esperado**: Mensagem "Limite de 4 encantados", botão desabilitado

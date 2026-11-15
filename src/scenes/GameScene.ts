@@ -1998,24 +1998,23 @@ export class GameScene extends Phaser.Scene {
     return nearestIndex;
   }
 
-  /** Verifica se já existe um encantado da mesma aldeia em campo */
-  private hasEncantadoFromVillage(villageIndex: number, encantadoType: 'curupira' | 'mae_da_mata'): boolean {
-    if (encantadoType === 'curupira') {
-      return this.curupiras.some(c => c.villageIndex === villageIndex);
-    } else {
-      return this.maeDaMatas.some(m => m.villageIndex === villageIndex);
-    }
+  /** Verifica se já existe qualquer encantado dessa aldeia em campo */
+  private hasEncantadoFromVillage(villageIndex: number): boolean {
+    return (
+      this.curupiras.some(c => c.villageIndex === villageIndex) ||
+      this.maeDaMatas.some(m => m.villageIndex === villageIndex)
+    );
   }
 
-  /** Invoca um Curupira na aldeia escolhida. Devolve false se o limite de encantados em campo já foi atingido ou se já há um Curupira dessa aldeia */
+  /** Invoca um Curupira na aldeia escolhida. Devolve false se o limite de encantados em campo já foi atingido ou se já há um encantado dessa aldeia */
   private spawnCurupira(village: { x: number; y: number }): boolean {
     const villageIndex = this.getVillageIndex(village.x, village.y);
 
     // Verifica limite global de encantados
     if (this.getEncantadoCount() >= BALANCE.ENCANTADOS_MAX_ACTIVE) return false;
 
-    // Verifica se já há um Curupira dessa aldeia em campo
-    if (this.hasEncantadoFromVillage(villageIndex, 'curupira')) return false;
+    // Verifica se já há qualquer encantado dessa aldeia em campo
+    if (this.hasEncantadoFromVillage(villageIndex)) return false;
 
     const spawn = getCollisionSystem(this).snapToFree(village.x, village.y + 60);
     const curupira = new Curupira(
@@ -2033,15 +2032,15 @@ export class GameScene extends Phaser.Scene {
     return true;
   }
 
-  /** Invoca uma Mãe da Mata na aldeia escolhida. Devolve false se o limite de encantados em campo já foi atingido ou se já há uma Mãe da Mata dessa aldeia */
+  /** Invoca uma Mãe da Mata na aldeia escolhida. Devolve false se o limite de encantados em campo já foi atingido ou se já há um encantado dessa aldeia */
   private spawnMaeDaMata(village: { x: number; y: number }): boolean {
     const villageIndex = this.getVillageIndex(village.x, village.y);
 
     // Verifica limite global de encantados
     if (this.getEncantadoCount() >= BALANCE.ENCANTADOS_MAX_ACTIVE) return false;
 
-    // Verifica se já há uma Mãe da Mata dessa aldeia em campo
-    if (this.hasEncantadoFromVillage(villageIndex, 'mae_da_mata')) return false;
+    // Verifica se já há qualquer encantado dessa aldeia em campo
+    if (this.hasEncantadoFromVillage(villageIndex)) return false;
 
     const spawn = getCollisionSystem(this).snapToFree(village.x, village.y + 60);
     const maeDaMata = new MaeDaMata(
