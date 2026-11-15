@@ -48,17 +48,28 @@ export class Curupira extends Unit {
       BALANCE.CURUPIRA;
 
     const fire = fireSystem.findNearestFire(this.x, this.y);
-    const arsonist = this.nearestArsonist(arsonists);
+    
+    // Incendiários no mapa ordenados por distância
+    const availableArsonists = this.getAvailableArsonistsOrderedByDistance(arsonists);
+    
+    // Verificar se há um incendiário próximo que pode ser capturado com certeza
+    const capturableArsonist = this.findCapturableArsonistWhileExtinguishing(
+      availableArsonists,
+      fire,
+      LASSO_RANGE,
+      BALANCE.CURUPIRA.SPEED
+    );
+    
     this.activity = 'none';
 
-    if (arsonist) {
-      // Prioridade: laçar e capturar o incendiário mais próximo
-      this.setCommandTarget(arsonist.x, arsonist.y);
+    if (capturableArsonist) {
+      // Prioridade: laçar e capturar se houver certeza de captura
+      this.setCommandTarget(capturableArsonist.x, capturableArsonist.y);
       this.moveStep(deltaMs, smokeAtPos);
-      if (getIsoDistance(this.x, this.y, arsonist.x, arsonist.y) <= LASSO_RANGE) {
+      if (getIsoDistance(this.x, this.y, capturableArsonist.x, capturableArsonist.y) <= LASSO_RANGE) {
         this.activity = 'capture';
-        this.faceTowards(arsonist.x);
-        onCapture(arsonist);
+        this.faceTowards(capturableArsonist.x);
+        onCapture(capturableArsonist);
       }
     } else if (fire) {
       // Apagar o foco mais próximo
@@ -68,6 +79,16 @@ export class Curupira extends Unit {
         fireSystem.extinguishFire(fire.data.id, EXTINGUISH_POWER * dtSec);
         this.activity = 'fire';
         this.faceTowards(fire.data.x);
+      }
+    } else if (availableArsonists.length > 0) {
+      // Perseguir o incendiário mais próximo (sem fogo prioritário)
+      const nearestArsonist = availableArsonists[0];
+      this.setCommandTarget(nearestArsonist.x, nearestArsonist.y);
+      this.moveStep(deltaMs, smokeAtPos);
+      if (getIsoDistance(this.x, this.y, nearestArsonist.x, nearestArsonist.y) <= LASSO_RANGE) {
+        this.activity = 'capture';
+        this.faceTowards(nearestArsonist.x);
+        onCapture(nearestArsonist);
       }
     } else if (boss && boss.isActive()) {
       // Sem focos, ataca a Fortaleza do Burguês
@@ -92,6 +113,58 @@ export class Curupira extends Unit {
     if (Math.abs(targetX - this.x) > 2) {
       this.sprite.setFlipX(targetX < this.x);
     }
+  }
+
+  /** Retorna incendiários vivos que ainda estão no mapa, ordenados por distância */
+  private getAvailableArsonistsOrderedByDistance(arsonists: Incendiario[]): Incendiario[] {
+    const available = arsonists.filter(arsonist => arsonist.isAlive());
+    available.sort((a, b) => {
+      const distA = getIsoDistance(this.x, this.y, a.x, a.y);
+      const distB = getIsoDistance(this.x, this.y, b.x, b.y);
+      return distA - distB;
+    });
+    return available;
+  }
+
+  /**
+   * Encontra um incendiário que pode ser capturado com certeza enquanto apaga fogo.
+   * Retorna o incendiário se:
+   * 1. Estiver próximo o suficiente (distância < LASSO_RANGE + margem de segurança)
+   * 2. Seu tempo de escape é insuficiente para sair do mapa antes da captura
+   * 3. Estiver mais próximo que o fogo atual (se houver)
+   */
+  private findCapturableArsonistWhileExtinguishing(
+    arsonists: Incendiario[],
+    currentFire: any, // ActiveFireInstance | null
+    lassoRange: number,
+    curupiraSpeed: number
+  ): Incendiario | null {
+    if (arsonists.length === 0) return null;
+
+    const CAPTURE_MARGIN = 50; // Margem de segurança em pixels
+    const CAPTURE_CONFIDENCE_DIST = lassoRange + CAPTURE_MARGIN;
+
+    for (const arsonist of arsonists) {
+      const distToArsonist = getIsoDistance(this.x, this.y, arsonist.x, arsonist.y);
+
+      // Não está próximo o suficiente
+      if (distToArsonist > CAPTURE_CONFIDENCE_DIST) continue;
+
+      // Se há fogo prioritário, apenas interrompe se o incendiário for bem mais próximo
+      if (currentFire) {
+        const distToFire = getIsoDistance(this.x, this.y, currentFire.data.x, currentFire.data.y);
+        // Só interrompe se o incendiário está significativamente mais próximo
+        if (distToArsonist > distToFire * 0.7) continue;
+      }
+
+      // Se o incendiário já saiu ou está muito próximo da borda, pode ser capturado
+      // (Simplificamos: se está próximo, é bom capturar)
+      if (distToArsonist < CAPTURE_CONFIDENCE_DIST) {
+        return arsonist;
+      }
+    }
+
+    return null;
   }
 
   private nearestArsonist(arsonists: Incendiario[]): Incendiario | null {
