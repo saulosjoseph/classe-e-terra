@@ -5,7 +5,8 @@ import {
   CAMPO_RADIUS_Y,
   WORLD_CENTER_X,
   WORLD_CENTER_Y,
-  getRandomPointInSector
+  getRandomPointInSector,
+  ALDEIA_POSITIONS
 } from '../config/GameBalance';
 import { SoundManager } from '../audio/SoundManager';
 import {
@@ -21,6 +22,11 @@ import { getGameClock } from './GameClock';
 /** Chaves de recarga da invocação dos encantados, usadas pelas aldeias */
 export const CURUPIRA_COOLDOWN_KEY = 'CURUPIRA_INVOCACAO';
 export const MAE_DA_MATA_COOLDOWN_KEY = 'MAE_DA_MATA_INVOCACAO';
+
+/** Gera uma chave única para cooldown de encantado por aldeia e tipo */
+function getEncantadoCooldownKey(villageIndex: number, encantadoType: 'curupira' | 'mae_da_mata'): string {
+  return `${encantadoType.toUpperCase()}_VILLAGE_${villageIndex}`;
+}
 
 export class SectorSystem extends Phaser.Events.EventEmitter {
   private scene: Phaser.Scene;
@@ -215,18 +221,57 @@ export class SectorSystem extends Phaser.Events.EventEmitter {
   }
 
   /**
+   * Encontra o índice da aldeia mais próxima à posição fornecida
+   */
+  private getVillageIndex(x: number, y: number): number {
+    let nearestIndex = 0;
+    let nearestDist = Infinity;
+    for (let i = 0; i < ALDEIA_POSITIONS.length; i++) {
+      const v = ALDEIA_POSITIONS[i];
+      const dx = v.x - x;
+      const dy = v.y - y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < nearestDist) {
+        nearestDist = dist;
+        nearestIndex = i;
+      }
+    }
+    return nearestIndex;
+  }
+
+  /**
+   * Verifica se o cooldown de um encantado específico está pronto em uma aldeia
+   */
+  public isEncantadoReadyAtVillage(villageIndex: number, encantadoType: 'curupira' | 'mae_da_mata'): boolean {
+    const cooldownKey = getEncantadoCooldownKey(villageIndex, encantadoType);
+    return this.getCooldownRemainingRatio(cooldownKey) <= 0;
+  }
+
+  /**
+   * Obtém o tempo restante (em ms) de cooldown de um encantado em uma aldeia
+   */
+  public getEncantadoCooldownRemainingMs(villageIndex: number, encantadoType: 'curupira' | 'mae_da_mata'): number {
+    const cooldownKey = getEncantadoCooldownKey(villageIndex, encantadoType);
+    return this.getCooldownRemainingMs(cooldownKey);
+  }
+
+  /**
    * Invoca um encantado a partir de uma aldeia, com recarga própria. `onInvoke` cria o encantado e devolve false se não puder.
    */
   public executeEncantadoInvocation(
-    cooldownKey: string,
-    message: string,
     village: { x: number; y: number },
+    encantadoType: 'curupira' | 'mae_da_mata',
+    message: string,
     onInvoke: () => boolean
   ): boolean {
+    const villageIndex = this.getVillageIndex(village.x, village.y);
+    const cooldownKey = getEncantadoCooldownKey(villageIndex, encantadoType);
+    
     if (!this.isActionReady(cooldownKey)) return false;
     if (!onInvoke()) return false;
+    
     const cooldownMs =
-      cooldownKey === CURUPIRA_COOLDOWN_KEY
+      encantadoType === 'curupira'
         ? BALANCE.COOLDOWNS.LOCAL_FLORESTA_ENCANTADOS
         : BALANCE.COOLDOWNS.LOCAL_MAE_DA_MATA;
     this.triggerCooldown(cooldownKey, cooldownMs, SectorType.FLORESTA);

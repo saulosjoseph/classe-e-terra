@@ -55,7 +55,7 @@ import { CollisionSystem, getCollisionSystem, registerCollisionSystem } from '..
 import { GameClock, registerGameClock } from '../systems/GameClock';
 import { ActiveFireInstance, FireSmokeSystem, ScorchMark } from '../systems/FireSmokeSystem';
 import { PoliticalPhaseSystem } from '../systems/PoliticalPhaseSystem';
-import { CURUPIRA_COOLDOWN_KEY, MAE_DA_MATA_COOLDOWN_KEY, SectorSystem } from '../systems/SectorSystem';
+import { SectorSystem } from '../systems/SectorSystem';
 import { SpawnerSystem } from '../systems/SpawnerSystem';
 import { StaticLayerRecorder, StaticMapTiles, bakeStaticMapLayers } from '../systems/StaticMapTiles';
 import { SpeechBubble } from '../ui/SpeechBubble';
@@ -1981,9 +1981,41 @@ export class GameScene extends Phaser.Scene {
     return this.curupiras.length + this.maeDaMatas.length;
   }
 
-  /** Invoca um Curupira na aldeia escolhida. Devolve false se o limite de encantados em campo já foi atingido */
+  /** Encontra o índice da aldeia mais próxima à posição fornecida */
+  private getVillageIndex(x: number, y: number): number {
+    let nearestIndex = 0;
+    let nearestDist = Infinity;
+    for (let i = 0; i < ALDEIA_POSITIONS.length; i++) {
+      const v = ALDEIA_POSITIONS[i];
+      const dx = v.x - x;
+      const dy = v.y - y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < nearestDist) {
+        nearestDist = dist;
+        nearestIndex = i;
+      }
+    }
+    return nearestIndex;
+  }
+
+  /** Verifica se já existe um encantado da mesma aldeia em campo */
+  private hasEncantadoFromVillage(villageIndex: number, encantadoType: 'curupira' | 'mae_da_mata'): boolean {
+    if (encantadoType === 'curupira') {
+      return this.curupiras.some(c => c.villageIndex === villageIndex);
+    } else {
+      return this.maeDaMatas.some(m => m.villageIndex === villageIndex);
+    }
+  }
+
+  /** Invoca um Curupira na aldeia escolhida. Devolve false se o limite de encantados em campo já foi atingido ou se já há um Curupira dessa aldeia */
   private spawnCurupira(village: { x: number; y: number }): boolean {
+    const villageIndex = this.getVillageIndex(village.x, village.y);
+
+    // Verifica limite global de encantados
     if (this.getEncantadoCount() >= BALANCE.ENCANTADOS_MAX_ACTIVE) return false;
+
+    // Verifica se já há um Curupira dessa aldeia em campo
+    if (this.hasEncantadoFromVillage(villageIndex, 'curupira')) return false;
 
     const spawn = getCollisionSystem(this).snapToFree(village.x, village.y + 60);
     const curupira = new Curupira(
@@ -1991,7 +2023,8 @@ export class GameScene extends Phaser.Scene {
       `curupira_${this.nextUnitId++}`,
       spawn.x,
       spawn.y,
-      this.clock.now() + BALANCE.CURUPIRA.LIFETIME_MS
+      this.clock.now() + BALANCE.CURUPIRA.LIFETIME_MS,
+      villageIndex
     );
     this.curupiras.push(curupira);
     curupira.on('unit-tapped', (clicked: Unit) => {
@@ -2000,9 +2033,15 @@ export class GameScene extends Phaser.Scene {
     return true;
   }
 
-  /** Invoca uma Mãe da Mata na aldeia escolhida. Devolve false se o limite de encantados em campo já foi atingido */
+  /** Invoca uma Mãe da Mata na aldeia escolhida. Devolve false se o limite de encantados em campo já foi atingido ou se já há uma Mãe da Mata dessa aldeia */
   private spawnMaeDaMata(village: { x: number; y: number }): boolean {
+    const villageIndex = this.getVillageIndex(village.x, village.y);
+
+    // Verifica limite global de encantados
     if (this.getEncantadoCount() >= BALANCE.ENCANTADOS_MAX_ACTIVE) return false;
+
+    // Verifica se já há uma Mãe da Mata dessa aldeia em campo
+    if (this.hasEncantadoFromVillage(villageIndex, 'mae_da_mata')) return false;
 
     const spawn = getCollisionSystem(this).snapToFree(village.x, village.y + 60);
     const maeDaMata = new MaeDaMata(
@@ -2010,7 +2049,8 @@ export class GameScene extends Phaser.Scene {
       `mae_da_mata_${this.nextUnitId++}`,
       spawn.x,
       spawn.y,
-      this.clock.now() + BALANCE.MAE_DA_MATA.LIFETIME_MS
+      this.clock.now() + BALANCE.MAE_DA_MATA.LIFETIME_MS,
+      villageIndex
     );
     this.maeDaMatas.push(maeDaMata);
     maeDaMata.on('unit-tapped', (clicked: Unit) => {
@@ -2103,28 +2143,30 @@ export class GameScene extends Phaser.Scene {
   /** Invocação feita pela aldeia clicada (ver o modal da aldeia na UIScene) */
   public invokeCurupiraFromVillage(village: { x: number; y: number }): boolean {
     return this.sectorSystem.executeEncantadoInvocation(
-      CURUPIRA_COOLDOWN_KEY,
-      '🌿 Curupira invocado!',
       village,
+      'curupira',
+      '🌿 Curupira invocado!',
       () => this.spawnCurupira(village)
     );
   }
 
   public invokeMaeDaMataFromVillage(village: { x: number; y: number }): boolean {
     return this.sectorSystem.executeEncantadoInvocation(
-      MAE_DA_MATA_COOLDOWN_KEY,
-      '🌿 Mãe da Mata invocada!',
       village,
+      'mae_da_mata',
+      '🌿 Mãe da Mata invocada!',
       () => this.spawnMaeDaMata(village)
     );
   }
 
-  public getCurupiraCooldownRemainingMs(): number {
-    return this.sectorSystem.getCooldownRemainingMs(CURUPIRA_COOLDOWN_KEY);
+  public getCurupiraCooldownRemainingMs(village: { x: number; y: number }): number {
+    const villageIndex = this.getVillageIndex(village.x, village.y);
+    return this.sectorSystem.getEncantadoCooldownRemainingMs(villageIndex, 'curupira');
   }
 
-  public getMaeDaMataCooldownRemainingMs(): number {
-    return this.sectorSystem.getCooldownRemainingMs(MAE_DA_MATA_COOLDOWN_KEY);
+  public getMaeDaMataCooldownRemainingMs(village: { x: number; y: number }): number {
+    const villageIndex = this.getVillageIndex(village.x, village.y);
+    return this.sectorSystem.getEncantadoCooldownRemainingMs(villageIndex, 'mae_da_mata');
   }
 
   public triggerLocalAction(type: LocalActionType): boolean {

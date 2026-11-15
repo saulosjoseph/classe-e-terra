@@ -31,9 +31,10 @@ A tela apresenta uma visão isométrica ou superior de Santarém, dividida em tr
 
 ### 🌿 Os Encantados (Renovação da Floresta)
 * **Quem invoca:** As aldeias indígenas. Ao tocar em uma aldeia, abre-se a opção "Invocar Curupira" ou "Invocar Mãe da Mata", e o encantado nasce nessa aldeia.
-* **Limite:** No máximo 4 encantados em campo ao mesmo tempo, somando Curupiras e Mães da Mata.
-* **Recarga:** 3 minutos para cada tipo de encantado, separadamente.
-* **Duração:** 60 segundos. Depois disso, ele deixa a partida.
+* **Limite por aldeia:** Cada aldeia pode ter no máximo UM encantado em campo por vez (de qualquer tipo). Não é possível invocar outro encantado na mesma aldeia enquanto já houver um em ação.
+* **Limite global:** No máximo 4 encantados em campo ao mesmo tempo, somando todos os encantados de todas as aldeias.
+* **Recarga:** 3 minutos de recarga por aldeia, separadamente para cada tipo de encantado. Ou seja, a aldeia A pode invocar um Curupira, e 3 minutos depois invocar uma Mãe da Mata; a aldeia B tem sua própria recarga independente.
+* **Duração:** 60 segundos. Depois disso, ele deixa a partida e a aldeia fica livre para invocar outro encantado.
 
 #### O Curupira
 * **Comportamento:** Age sozinho. Prioridades: (1) laçar e capturar o incendiário mais próximo, a até 56 px; (2) apagar o foco mais próximo; (3) sem focos, atacar a Fortaleza do Burguês, se estiver ativa; (4) sem nada disso, fica parado na aldeia.

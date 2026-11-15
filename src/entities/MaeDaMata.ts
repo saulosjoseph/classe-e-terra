@@ -16,14 +16,17 @@ type MaeDaMataActivity = 'none' | 'water' | 'replant';
 export class MaeDaMata extends Unit {
   /** Instante (no GameClock) em que o encantado deixa a partida */
   public readonly expiresAt: number;
+  /** Índice da aldeia que a invocou (0-3) */
+  public readonly villageIndex: number;
   private activity: MaeDaMataActivity = 'none';
   private replantProgressMs = 0;
   private replantTarget: { x: number; y: number } | null = null;
   private retargetInMs = 0;
 
-  constructor(scene: Phaser.Scene, id: string, x: number, y: number, expiresAt: number) {
+  constructor(scene: Phaser.Scene, id: string, x: number, y: number, expiresAt: number, villageIndex: number) {
     super(scene, id, UnitType.MAE_DA_MATA, 'mae_da_mata', x, y);
     this.expiresAt = expiresAt;
+    this.villageIndex = villageIndex;
     this.baseSpeed = BALANCE.MAE_DA_MATA.SPEED;
     this.sprite.setScale(0.5);
     this.sprite.setOrigin(0.5, 0.9375);

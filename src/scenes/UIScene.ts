@@ -947,8 +947,8 @@ export class UIScene extends Phaser.Scene {
     ]);
 
     const full = (): boolean => gs.getEncantadoCount() >= BALANCE.ENCANTADOS_MAX_ACTIVE;
-    const curupiraReady = (): boolean => !full() && gs.getCurupiraCooldownRemainingMs() <= 0;
-    const maeDaMataReady = (): boolean => !full() && gs.getMaeDaMataCooldownRemainingMs() <= 0;
+    const curupiraReady = (): boolean => !full() && gs.getCurupiraCooldownRemainingMs(village) <= 0;
+    const maeDaMataReady = (): boolean => !full() && gs.getMaeDaMataCooldownRemainingMs(village) <= 0;
 
     const formatWait = (ms: number): string => {
       const sec = Math.ceil(ms / 1000);
@@ -989,7 +989,7 @@ export class UIScene extends Phaser.Scene {
         curText,
         curStatus,
         curupiraReady(),
-        gs.getCurupiraCooldownRemainingMs(),
+        gs.getCurupiraCooldownRemainingMs(village),
         0x14532d,
         0x4ade80
       );
@@ -998,7 +998,7 @@ export class UIScene extends Phaser.Scene {
         maeText,
         maeStatus,
         maeDaMataReady(),
-        gs.getMaeDaMataCooldownRemainingMs(),
+        gs.getMaeDaMataCooldownRemainingMs(village),
         0x134e4a,
         0x5eead4
       );

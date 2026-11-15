@@ -15,11 +15,14 @@ type CurupiraActivity = 'none' | 'fire' | 'boss' | 'capture';
 export class Curupira extends Unit {
   /** Instante (no GameClock) em que o encantado deixa a partida */
   public readonly expiresAt: number;
+  /** Índice da aldeia que o invocou (0-3) */
+  public readonly villageIndex: number;
   private activity: CurupiraActivity = 'none';
 
-  constructor(scene: Phaser.Scene, id: string, x: number, y: number, expiresAt: number) {
+  constructor(scene: Phaser.Scene, id: string, x: number, y: number, expiresAt: number, villageIndex: number) {
     super(scene, id, UnitType.CURUPIRA, 'curupira', x, y);
     this.expiresAt = expiresAt;
+    this.villageIndex = villageIndex;
     this.baseSpeed = BALANCE.CURUPIRA.SPEED;
     this.sprite.setScale(0.58);
     this.sprite.setOrigin(0.5, 0.9375);
