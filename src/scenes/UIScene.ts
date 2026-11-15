@@ -311,7 +311,7 @@ export class UIScene extends Phaser.Scene {
       .setInteractive({ useHandCursor: true })
       .setDepth(85);
 
-    menuBtn.on('pointerdown', () => {
+    menuBtn.on('pointerup', () => {
       SoundManager.unlock();
       this.optionsMenu.toggle();
     });
