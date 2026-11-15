@@ -28,12 +28,12 @@ const STAMP_RESOLUTION = 0.5;
 const SCORCH_CULL_MARGIN = 256;
 /** Lado das células que registram terreno já queimado: um foco só se expande para células ainda não queimadas */
 const BURN_CELL_SIZE = 40;
-/** Distância dos pontos checados em volta de um foco para saber se ainda há terreno para expandir */
-const EXPANSION_PROBE_DIST = 60;
-const PROBE_DIRECTIONS: ReadonlyArray<readonly [number, number]> = [
-  [1, 0], [-1, 0], [0, 1], [0, -1],
-  [0.7071, 0.7071], [0.7071, -0.7071], [-0.7071, 0.7071], [-0.7071, -0.7071]
-];
+/** Faixa de distância dos novos focos: a mesma usada pela propagação */
+const SPREAD_MIN_DIST = 55;
+const SPREAD_MAX_DIST = 92;
+/** Pontos checados na faixa de propagação para saber se ainda há terreno para expandir */
+const EXPANSION_PROBE_RADII = [SPREAD_MIN_DIST, 74, SPREAD_MAX_DIST];
+const EXPANSION_PROBE_ANGLES = 16;
 /** Perda de intensidade por segundo de um foco esgotado, que se apaga sozinho */
 const EXHAUSTED_DECAY_PER_SEC = 12;
 /** Intervalo mínimo entre redesenhos das barras de intensidade */
@@ -132,12 +132,15 @@ export class FireSmokeSystem extends Phaser.Events.EventEmitter {
     return this.burnedCells[j * this.burnedCols + i] === 1;
   }
 
-  /** Um foco está cercado quando todos os pontos ao redor já estão queimados: não há mais para onde crescer */
+  /** Um foco está cercado quando não sobra terreno livre na faixa em que ele poderia propagar */
   private isSurrounded(inst: ActiveFireInstance): boolean {
-    for (const [dx, dy] of PROBE_DIRECTIONS) {
-      const px = inst.data.x + dx * EXPANSION_PROBE_DIST;
-      const py = inst.data.y + dy * EXPANSION_PROBE_DIST * ISO_Y_RATIO;
-      if (!this.isBurned(px, py)) return false;
+    for (const radius of EXPANSION_PROBE_RADII) {
+      for (let k = 0; k < EXPANSION_PROBE_ANGLES; k++) {
+        const angle = (k / EXPANSION_PROBE_ANGLES) * Math.PI * 2;
+        const px = inst.data.x + Math.cos(angle) * radius;
+        const py = inst.data.y + Math.sin(angle) * radius * ISO_Y_RATIO;
+        if (!this.isBurned(px, py)) return false;
+      }
     }
     return true;
   }
@@ -618,12 +621,8 @@ export class FireSmokeSystem extends Phaser.Events.EventEmitter {
           const chance =
             inst.data.sector === SectorType.FLORESTA && indigenousDemarcationActive ? 0.22 : 0.42;
           if (Math.random() < chance) {
-            const groundAngleToCity = Math.atan2(
-              (WORLD_CENTER_Y - inst.data.y) * ISO_INVERSE_Y_RATIO,
-              WORLD_CENTER_X - inst.data.x
-            );
-            const spreadAngle = groundAngleToCity + Phaser.Math.FloatBetween(-0.95, 0.95);
-            const dist = Phaser.Math.Between(55, 92);
+            const spreadAngle = Math.random() * Math.PI * 2;
+            const dist = Phaser.Math.Between(SPREAD_MIN_DIST, SPREAD_MAX_DIST);
             const targetX = inst.data.x + Math.cos(spreadAngle) * dist;
             const targetY = inst.data.y + Math.sin(spreadAngle) * (dist * ISO_Y_RATIO);
             if (!this.isBurned(targetX, targetY)) {

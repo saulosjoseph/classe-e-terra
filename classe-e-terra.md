@@ -54,6 +54,12 @@ O avanço da Consciência Coletiva faz nascer unidades móveis que interagem dir
 3. **A Fumaça (O Efeito Tóxico):** Gerada pelo fogo. Evolui de uma névoa cinza clara para um preto denso absoluto. Intoxica trabalhadores e dobra o tempo de recarga (*cooldown*) das habilidades.
 4. **O Burguês (O Chefão Final):** Financiador oculto. Só aparece quando a Consciência Coletiva atinge 100%.
 
+### 🔥 Dinâmica do Fogo
+* **Crescimento:** Cada foco ativo ganha intensidade (0 a 100) em progressão geométrica, mais rápido quanto mais intenso. O ritmo depende da dificuldade e cai pela metade na Floresta com Terras Indígenas demarcadas.
+* **Propagação:** Com intensidade a partir de 74%, um foco tenta criar um novo foco a 55–92 px, em qualquer direção, com chance de 42% a cada 3,8 s (22% na Floresta demarcada). O novo foco nasce com intensidade 22%. Não há propagação para terreno já queimado, para fora do mapa, nem para dentro de aceiros ou do escudo d'água. O novo foco nasce com intensidade 22%. Não há propagação para terreno já queimado, para fora do mapa, nem para dentro de aceiros ou do escudo d'água.
+* **Ignição de árvores e matos:** Uma árvore saudável ou mato a até 192 px de um foco pode pegar fogo, com chance proporcional à intensidade do foco. Ao pegar fogo, a árvore também gera um novo foco. A árvore queimada vira marca de queimada e continua bloqueando a passagem.
+* **Apagamento:** Um foco se apaga pela ação dos brigadistas, bombeiros e trabalhadores rurais, ou quando fica **cercado**, isto é, sem terreno livre na faixa de 55–92 px onde poderia propagar. Um foco cercado para de crescer e se extingue em poucos segundos. Um foco não cercado não perde intensidade sozinho e continua queimando, e se espalhando, até ser apagado. A barreira de exaustão da Cidade (ação local) reduz a intensidade dos focos, mas não os apaga.
+
 ## 5. O Coração Estratégico: As Ações Integradas
 
 Para evoluir a barra de **Consciência Coletiva (0% a 100%)**, o jogador precisa cruzar recursos de um setor para o outro:
