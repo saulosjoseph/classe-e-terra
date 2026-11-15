@@ -1,0 +1,456 @@
+╔════════════════════════════════════════════════════════════════════════════════╗
+║         🎮 VISUAL: ONDE O JOGADOR CLICA E O QUE ACONTECE                      ║
+╚════════════════════════════════════════════════════════════════════════════════╝
+
+═══════════════════════════════════════════════════════════════════════════════════
+
+1️⃣  MOBILIZAÇÃO POPULAR NA CIDADE 👥 (Ação Local da Cidade)
+─────────────────────────────────────────────────────────────────────────────────
+
+ANTES:
+┌─ Tela do Jogo ──────────────────────────────────────┐
+│                                                      │
+│         🏙️ CIDADE                                   │
+│    ┌─────────────────┐                              │
+│    │  Casa  Casa Casa │                              │
+│    │  Casa  Casa Casa │  (Casas desconectadas)      │
+│    └─────────────────┘                              │
+│                                                      │
+│         [UI: Ações Integradas]                       │
+│         ┌──────────────────────┐                     │
+│         │ 🔧 Cidade→Floresta   │                     │
+│         │ 🌽 Campo→Cidade      │                     │
+│         │ 💧 Floresta→Campo    │                     │
+│         │ 📢 Captura→Cidade    │                     │
+│         └──────────────────────┘                     │
+└─────────────────────────────────────────────────────┘
+
+AÇÃO DO JOGADOR:
+┌─ O jogador clica no botão: 👥 MOBILIZAÇÃO POPULAR ─────┐
+│                                                         │
+│ REQUISITO: Mínimo 2 casas doaram nos últimos 30s      │
+│ RECARGA: 45 segundos                                  │
+│ GANHO: +2% Consciência                                │
+└─────────────────────────────────────────────────────────┘
+
+DEPOIS:
+┌─ Tela do Jogo ──────────────────────────────────────┐
+│                                                      │
+│         🏙️ CIDADE                                   │
+│    ┌─────────────────┐                              │
+│    │ 👤 👥👤 👥 👤👥 │ ← PESSOAS SAINDO!             │
+│    │ 👤 👥 👤 👥 👤👥 │   Assembleia na Prefeitura  │
+│    └─────────────────┘                              │
+│           ↓                                          │
+│      🏛️ PREFEITURA                                  │
+│      [Voz de multidão] "PÃO E LUTA!"               │
+│                                                      │
+│      ✨ +2% CONSCIÊNCIA ✨                          │
+│      + Trabalhadores +15% força/vel por 20s         │
+│      + -3s cooldown próxima ação integrada          │
+│                                                      │
+│         [UI: Ação pronta novamente em 45s]          │
+└─────────────────────────────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════════
+
+2️⃣  MUTIRÃO DE PROTEÇÃO 🤝 (Ação Local do Campo)
+─────────────────────────────────────────────────────────────────────────────────
+
+ANTES:
+┌─ Tela do Jogo ──────────────────────────────────────┐
+│                                                      │
+│           🌾 CAMPO                                  │
+│      🌽 🌽 [🔥] 🌽 🌽                                 │
+│       ↑                                              │
+│    Foco de fogo ativo                               │
+│    (ameaça real à colheita)                         │
+│                                                      │
+│    👨 👩 (2 Trabalhadores Rurais correndo)           │
+│                                                      │
+│       Botão: 🤝 MUTIRÃO inativo (sem ameaça)       │
+└─────────────────────────────────────────────────────┘
+
+AÇÃO DO JOGADOR:
+┌─ O jogador clica no botão: 🤝 MUTIRÃO DE PROTEÇÃO ──┐
+│                                                      │
+│ REQUISITO: Há um foco de fogo ativo no Campo        │
+│ RECARGA: 50 segundos                                │
+│ GANHO: +3% Consciência                              │
+└─────────────────────────────────────────────────────┘
+
+DURANTE (0-25 segundos):
+┌─ Tela do Jogo ──────────────────────────────────────┐
+│                                                      │
+│           🌾 CAMPO                                  │
+│      🌽 👨👩👨👩👨 🌽 ← Mais trabalhadores aparecem! │
+│       👩👨 [🔥] 👨👩👨                                 │
+│      🌽 👨👩👨👩👨 🌽                                  │
+│                                                      │
+│    🟢🟢🟢🟢🟢 ← Escudo verde ao redor                │
+│                                                      │
+│      +Força/Velocidade: +20% para brigadistas       │
+│      +Proteção: -40% dano direto do fogo            │
+│                                                      │
+│      ✨ +3% CONSCIÊNCIA ✨                          │
+└─────────────────────────────────────────────────────┘
+
+SINERGIA:
+┌─ Se executar "Floresta→Campo" enquanto mutirão:    ┐
+│                                                      │
+│  Ambas as ações ganham -5s no cooldown              │
+│  (Reflorestamento + Defesa Agrícola = Poder!)       │
+└─────────────────────────────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════════
+
+3️⃣  RESGATE INDÍGENA 🌿 (Automático - Fase 2+)
+─────────────────────────────────────────────────────────────────────────────────
+
+ANTES:
+┌─ Tela do Jogo ──────────────────────────────────────┐
+│                                                      │
+│           🌳 FLORESTA                               │
+│    🎵 ✨ ⚡ CURUPIRA EM AÇÃO ⚡ ✨ 🎵               │
+│    (Capturou 2 incendiários, 60s expirando...)      │
+│                                                      │
+│    [Contador: 5... 4... 3... 2... 1...]             │
+│                                                      │
+│    Aldeia ao fundo (silenciosa)                      │
+└─────────────────────────────────────────────────────┘
+
+AUTOMÁTICO - CURUPIRA EXPIRA:
+┌─ Sistema detecta: Encantado expirou!               ┐
+│                                                     │
+│ Surgimento de opção visual sobre a Aldeia:         │
+│ 🎊 "CELEBRAR CAPTURA" ← Botão destaca em ouro      │
+└─────────────────────────────────────────────────────┘
+
+AÇÃO DO JOGADOR:
+┌─ O jogador clica em: 🎊 CELEBRAR CAPTURA          ┐
+│                                                     │
+│ (Ação automática - sem cooldown, sem custo)        │
+│ GANHO: +4% Consciência                             │
+└─────────────────────────────────────────────────────┘
+
+DEPOIS:
+┌─ Tela do Jogo ──────────────────────────────────────┐
+│                                                      │
+│           🌳 FLORESTA                               │
+│    ⭐ ✨ 🌿 ✨ ⭐                                    │
+│    (Aldeia celebrando, ritual mágico)               │
+│                                                      │
+│    👥👥 INDÍGENAS em círculo, dançando              │
+│    🦅 Pássaros voam sobre                           │
+│    💨 Fumaça sagrada ascendendo                     │
+│                                                      │
+│    ✨ +4% CONSCIÊNCIA ✨                            │
+│    + Próximo Curupira pronto em 70s (em vez 80s)   │
+│    + Brigadistas próximos ganham +10% força        │
+│                                                      │
+│    [UI: Próxima invocação reduzida]                 │
+└─────────────────────────────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════════
+
+4️⃣  EDUCAÇÃO AMBIENTAL 📚 (Fase 4+ - Guarda Florestal)
+─────────────────────────────────────────────────────────────────────────────────
+
+ANTES:
+┌─ Tela do Jogo ──────────────────────────────────────┐
+│                                                      │
+│    🌳 FLORESTA (lado direito)                       │
+│    🎯 GUARDA FLORESTAL patrulhando                  │
+│                                                      │
+│    [Rota de patrulha: Floresta apenas]              │
+│                                                      │
+│    CIDADE (lado esquerdo) - distante                │
+│    🏙️ Desconectada do Guarda                        │
+└─────────────────────────────────────────────────────┘
+
+AÇÃO DO JOGADOR:
+┌─ Clique no GUARDA FLORESTAL OU no botão 📚        ┐
+│                                                     │
+│ Opção surge: "📚 EDUCAÇÃO AMBIENTAL"               │
+│ REQUISITO: Fase 4+, Guarda presente                │
+│ RECARGA: 40 segundos                               │
+│ DURAÇÃO: 30 segundos de "missão educativa"         │
+│ GANHO: +3% Consciência ao final                    │
+└─────────────────────────────────────────────────────┘
+
+DURANTE (0-30 segundos):
+┌─ Tela do Jogo ──────────────────────────────────────┐
+│                                                      │
+│  CIDADE 🏙️         FLORESTA 🌳                      │
+│   │🏛️              🎯 ← Guarda em movimento        │
+│   │Casa┐            │                               │
+│   │Casa│ ← Caminho  │  (Rota especial)              │
+│   │Casa┘ brilhante  │                               │
+│   │[Guarda chega]   │                               │
+│                     │                               │
+│  [Pessoas saem]     │                               │
+│  [Guarda explica]   │                               │
+│  📚 "Somos donos    │                               │
+│      desta terra!"  │                               │
+│                     │                               │
+│    ⭐ +3% CONSCIÊNCIA ⭐                            │
+└─────────────────────────────────────────────────────┘
+
+EFEITOS:
+┌─ Casas que o Guarda passou por:                    ┐
+│  + 10% chance de poder doar novamente (cooldown -5s)│
+│                                                      │
+│ - Próxima "Captura→Cidade" com -5s cooldown        │
+│ - Brigadistas seguem Guarda com +15% força        │
+└─────────────────────────────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════════
+
+5️⃣  CORRENTE DE SOLIDARIEDADE ⚡ (Automática - Qualquer Fase)
+─────────────────────────────────────────────────────────────────────────────────
+
+ANTES:
+┌─ Jogo normal ────────────────────────────────────────┐
+│                                                      │
+│ Tempo: 0s   Jogador clica: Cidade→Floresta          │
+│ ✅ +5% Consciência                                  │
+│ [cooldown: 7,5s]                                    │
+│                                                      │
+│ Tempo: 3s   Jogador clica: Campo→Cidade             │
+│ ✅ +5% Consciência                                  │
+│ [cooldown: 7,5s]                                    │
+│                                                      │
+│ (Ações independentes, sem sinergia)                 │
+└─────────────────────────────────────────────────────┘
+
+AÇÃO DO JOGADOR (Nenhuma! É Automática):
+┌─ SISTEMA DETECTA: 2+ ações em 15s ─────────────────┐
+│                                                     │
+│ [Evento Automático - sem clique necessário]        │
+│                                                     │
+│ Primeira ação em 0s: Cidade→Floresta               │
+│ Segunda ação em 3s: Campo→Cidade                   │
+│                                                     │
+│ → CORRENTE DETECTADA! (apenas 3s de diferença!)    │
+└─────────────────────────────────────────────────────┘
+
+DEPOIS (Automático):
+┌─ Tela explode em luz! ────────────────────────────┐
+│                                                     │
+│    ⚡ ⚡ ⚡ ⚡ ⚡ ⚡ ⚡ ⚡ ⚡                      │
+│                                                     │
+│    [Linha de energia conecta Cidade-Campo-Floresta]│
+│                                                     │
+│    ⚡ CORRENTE DE SOLIDARIEDADE ATIVADA! ⚡         │
+│                                                     │
+│    ✨ +2% CONSCIÊNCIA EXTRA ✨                     │
+│    ⚡ -40% cooldown em ambas as ações              │
+│                                                     │
+│    Próximas ações prontas em:                       │
+│    4,5s em vez de 7,5s!                             │
+│                                                     │
+│    [Som: cristais tocando, harmonia crescendo]     │
+└─────────────────────────────────────────────────────┘
+
+COMBO (3+ ações em 30s):
+┌─ Se conseguir 3 ações integradas em 30s: ─────────┐
+│                                                     │
+│    ⚡ ⚡ ⚡ [EXPLOSÃO] ⚡ ⚡ ⚡                  │
+│                                                     │
+│    Tela pisca, todos brillham dourado              │
+│                                                     │
+│    ✨ +5% CONSCIÊNCIA EXTRA ✨                     │
+│    + 50% dano para TODAS as unidades por 20s      │
+│    + Sons épicos, vozes gritando "VIVA!"           │
+└─────────────────────────────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════════
+
+6️⃣  OCUPAÇÃO PREFEITURA 🏛️ (Contínua - Fase 5+)
+─────────────────────────────────────────────────────────────────────────────────
+
+ANTES:
+┌─ Tela do Jogo ──────────────────────────────────────┐
+│                                                      │
+│           🏙️ CIDADE                                │
+│                                                      │
+│      ┌──────────────┐                               │
+│      │  🏛️ PREFEITURA│ ← Vazia, governos distantes │
+│      └──────────────┘                               │
+│                                                      │
+│    Ruas vazias, povo desconectado                   │
+└─────────────────────────────────────────────────────┘
+
+AÇÃO DO JOGADOR:
+┌─ Clique na PREFEITURA ───────────────────────────┐
+│                                                     │
+│ Opção surge: "🏛️ OCUPAR A PREFEITURA"             │
+│ REQUISITO: Fase 5+, 3+ casas doaram               │
+│ RECARGA APÓS DESATIVAR: 60s                        │
+│ DURAÇÃO MÁXIMA: 90 segundos contínuos              │
+│ GANHO: +0,5% Consciência **por segundo**           │
+└─────────────────────────────────────────────────────┘
+
+PRIMEIRA AÇÃO - JOGADOR CLICA NOVAMENTE (para ATIVAR):
+┌─ Tela do Jogo ──────────────────────────────────────┐
+│                                                      │
+│           🏙️ CIDADE                                │
+│                                                      │
+│      ┌──────────────┐                               │
+│      │  🏛️ PREFEITURA│ ← CERCADA!                   │
+│      │  👥👥👥👥     │                               │
+│      │  👥👥👥👥     │   Multidão entrando!         │
+│      │  👥👥👥👥     │   Cartazes flutuando:         │
+│      └──────────────┘   "É DIREITO!"               │
+│      🟥🟥🟥🟥🟥        "FLOR E POVO, SIM!"          │
+│      (Aura vermelha)    "NOSSO TERRITÓRIO!"        │
+│                                                      │
+│  [Som: Palmas ritmadas, slogans de multidão]       │
+│  [Duração: 00:15 segundos de ocupação]             │
+│  [Ganho até agora: +7,5% Consciência]              │
+│                                                      │
+│  Enquanto ativa:                                    │
+│  ⚡ Cooldown de ações integradas: -50%             │
+│  (Cidade→Floresta pronta em 3,75s em vez 7,5s)    │
+└─────────────────────────────────────────────────────┘
+
+SEGUNDA AÇÃO - JOGADOR CLICA NOVAMENTE (para DESATIVAR):
+┌─ Tela do Jogo (após 45 segundos) ────────────────┐
+│                                                    │
+│    Ocupação ativa: 45 segundos                    │
+│    Ganho total: +22,5% de UMA AÇÃO!              │
+│                                                    │
+│    ⚠️ REPRESÁLIA DO BURGUÊS!                      │
+│                                                    │
+│    Incendiários dobram de velocidade              │
+│    por 60 segundos                                │
+│    (Represália: mais pressão para defender)       │
+│                                                    │
+│    [Barulho de sirenes, caos]                     │
+│    [Fumaça aumenta dramaticamente]                │
+│                                                    │
+│    Prefeitura indisponível por 60s               │
+│    (Polícia reprimindo, barricadas)               │
+└─────────────────────────────────────────────────┘
+
+TRADE-OFF ESTRATÉGICO:
+┌─────────────────────────────────────────────────┐
+│ PRESSÃO POLÍTICA = VITÓRIA RÁPIDA MAS PERIGOSA  │
+│                                                 │
+│ Pró:  +45% consciência em 90 segundos           │
+│       -50% cooldowns durante ocupação            │
+│                                                 │
+│ Contra: Represália (dobra incendiários por 60s) │
+│         Precisa se defender durante retaliação   │
+│                                                 │
+│ Estratégia: Ocupar quando está ganhando         │
+│            ou em momento crítico                 │
+└─────────────────────────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════════
+
+7️⃣  MEMÓRIA COLETIVA 🔮 (Ritual - Fase 3+)
+─────────────────────────────────────────────────────────────────────────────────
+
+ANTES:
+┌─ Tela do Jogo ──────────────────────────────────────┐
+│                                                      │
+│           🌳 FLORESTA                               │
+│    [Aldeias espalhadas nos 4 cantos]                │
+│                                                      │
+│    Aldeia do Norte:                                 │
+│    🏘️ [Silenciosa]                                 │
+│                                                      │
+│    Opção: Invocar Curupira / Invocar Mãe da Mata   │
+│    (Ações normais do Jogo)                          │
+└─────────────────────────────────────────────────────┘
+
+AÇÃO DO JOGADOR:
+┌─ Clique em uma ALDEIA, surge novo botão: ─────────┐
+│                                                     │
+│ 🔮 "INVOCAR MEMÓRIA COLETIVA"                      │
+│    (Além das opções de Curupira e Mãe)             │
+│                                                     │
+│ REQUISITO: Fase 3+ (35% consciência)               │
+│ RECARGA: 35 segundos                               │
+│ DURAÇÃO: 25 segundos (ritual longo)                │
+│ GANHO: +2% imediato + +0,2%/s = +7% total         │
+└─────────────────────────────────────────────────────┘
+
+DURANTE RITUAL (0-25 segundos):
+┌─ Tela do Jogo ──────────────────────────────────────┐
+│                                                      │
+│           🌳 FLORESTA                               │
+│    Aldeia do Norte:                                 │
+│    ⭐ ✨ 🔮 ✨ ⭐                                    │
+│                                                      │
+│    👥👥 INDÍGENAS em círculo                         │
+│    🥁 Tambores tocando (som ritual)                 │
+│    🕯️ Fogo sagrado central                         │
+│    🦅 Animais aparecem (conexão espiritual)        │
+│                                                      │
+│    AURA DE LUZ: Raio de 400px ao redor aldeia      │
+│    [Fumaça desaparece dentro do raio]               │
+│    [Árvores queimadas começam regeneração]          │
+│                                                      │
+│    ⏱️ Duração: 00:12 segundos                      │
+│    ✨ +4,4% Consciência acumulada                  │
+│                                                      │
+│    Efeitos simultâneos:                             │
+│    🌳 -1 árvore queimada a cada 5s                 │
+│    💨 Fumaça reduz 1 nível                          │
+│    🔥 Incendiários -25% velocidade                  │
+└─────────────────────────────────────────────────────┘
+
+APÓS RITUAL (t=25s):
+┌─ Tela do Jogo ──────────────────────────────────────┐
+│                                                      │
+│    ✨ +7% CONSCIÊNCIA TOTAL ✨                      │
+│                                                      │
+│    Aldeia continua brilhando (efeito residual)      │
+│    Floresta regenerada na área                      │
+│    Incendiários mais lentos                         │
+│                                                      │
+│    [Som: campainhas de harmonia]                    │
+│                                                      │
+│    Próximo ritual pronto em 35s                     │
+└─────────────────────────────────────────────────────┘
+
+MÚLTIPLOS RITUAIS SIMULTÂNEOS:
+┌─ Se executar em 4 aldeias (todas no mapa): ───────┐
+│                                                     │
+│    ⭐ ⭐ ⭐ ⭐                                    │
+│   (4 Rituals simultâneos em diferentes aldeias)    │
+│                                                     │
+│   +28% Consciência em 25 segundos!                 │
+│   Toda Floresta regenerando                        │
+│   Fumaça desaparecendo                             │
+│   Incendiários desacelerados em todo mapa          │
+│                                                     │
+│   (Requer coordenação, mas poderoso!)              │
+└─────────────────────────────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════════
+
+📊 RESUMO: SEQUÊNCIA TÍPICA DE GAMEPLAY
+
+FASE 2 (Semente - 20% consciência):
+├─ T=0s:   Encantado expira
+├─ T=1s:   Clica "Resgate Indígena" (automático) → +4%
+├─ T=10s:  Clica "Mutirão de Proteção" → +3%
+├─ T=30s:  Executa "Cidade→Floresta" → +5%
+├─ T=35s:  Executa "Campo→Cidade" em 35s
+├─ T=35s:  CORRENTE DETECTADA! → +2% bônus, -40% cooldown
+├─ T=60s:  Próxima "Cidade→Floresta" pronta em 3,75s!
+└─ TOTAL FASE: +4 +3 +5 +5 +2 = 19% em 1 minuto!
+
+FASE 5 (Escudo - 65% consciência):
+├─ T=0s:   Clica "Ocupação Prefeitura" → +0,5%/s
+├─ T=10s:  Ainda ocupando → +5% total
+├─ T=20s:  Executa "Captura→Cidade" (cooldown -50%) → +10% + bônus combo
+├─ T=45s:  Desativa ocupação → +22,5% total de ocupação
+├─ T=46s:  Represália: Incendiários dobram (estratégia precisa defender)
+├─ T=50s:  Ritual "Memória Coletiva" em aldeia → +7%
+└─ TOTAL FASE: +22,5 +10 +7 = 39,5% em 50 segundos!
+
+═══════════════════════════════════════════════════════════════════════════════════
