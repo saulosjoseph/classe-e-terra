@@ -68,16 +68,41 @@ function installCrispTextDefaults(): void {
  * Isso permite que o jogo continue rodando em background.
  */
 function disableAutoBlur(game: Phaser.Game): void {
-  // Disabilita o evento blur padrão do Phaser que pausa o jogo
+  // Desabilita eventos de blur do Phaser que pausam o jogo
   game.events.off(Phaser.Core.Events.BLUR);
+  game.events.off(Phaser.Core.Events.HIDDEN);
   
-  // Desabilita também o sleep do canvas
+  // Desabilita também os handlers padrão de focus/blur
   if (game.canvas) {
     game.canvas.addEventListener('blur', (event: Event) => {
       event.preventDefault();
       event.stopPropagation();
     }, true);
+    
+    game.canvas.addEventListener('focusout', (event: Event) => {
+      event.preventDefault();
+      event.stopPropagation();
+    }, true);
   }
+  
+  // Previne pause quando o documento fica oculto
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) return;
+    // Document ficou oculto, mas não vamos pausar o jogo
+    if (game.isRunning()) {
+      // Garante que o jogo continue rodando
+      if (game.loop.isPaused) {
+        game.loop.wake();
+      }
+    }
+  }, true);
+  
+  // Previne pause quando a janela perde foco
+  window.addEventListener('blur', () => {
+    if (game.isRunning() && game.loop.isPaused) {
+      game.loop.wake();
+    }
+  }, true);
 }
 
 const config: Phaser.Types.Core.GameConfig = {
@@ -100,6 +125,10 @@ const config: Phaser.Types.Core.GameConfig = {
   },
   input: {
     activePointers: 2
+  },
+  fps: {
+    target: 60,
+    forceSetTimeOut: false
   },
   scene: [BootScene, MenuScene, GameScene, UIScene, GameOverScene]
 };
