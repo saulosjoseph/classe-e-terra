@@ -299,6 +299,31 @@ export class UIScene extends Phaser.Scene {
       .setOrigin(0, 0.5)
       .setDepth(80);
 
+    // Botão de menu no canto superior direito
+    const menuBtnX = GAME_WIDTH - 18;
+    const menuBtnY = 18;
+    const menuBtn = this.add
+      .text(menuBtnX, menuBtnY, '☰', {
+        fontSize: '24px',
+        color: '#fde047'
+      })
+      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true })
+      .setDepth(85);
+
+    menuBtn.on('pointerdown', () => {
+      SoundManager.unlock();
+      this.optionsMenu.toggle();
+    });
+
+    menuBtn.on('pointerover', () => {
+      menuBtn.setStyle({ color: '#fef08a' });
+    });
+
+    menuBtn.on('pointerout', () => {
+      menuBtn.setStyle({ color: '#fde047' });
+    });
+
     // Botões de navegação removidos
   }
 
